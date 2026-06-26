@@ -317,7 +317,7 @@ function parsePcb(config) {
             res["radius"] = CoordToMMs(Prim.CornerRadius(Prim.Layer)).round();  //  smd ? th ?
         }
 
-        if ("A1".indexOf(Prim.Name) != -1) {
+        if (Prim.Name == "1" || Prim.Name == "A1") {  // pad named "1" or "A1"(BGA) -> pin 1
             res["pin1"] = 1;
         }
 
@@ -615,7 +615,7 @@ function parsePcb(config) {
         return res;
     }
 
-    // 90% done  // use the KiCad's font , not support chinese char.
+    // 90% done  // uses KiCad stroke font; CJK glyphs are included, unknown chars fall back to "?".
     function parseText(Prim) {
         var res = {};
         if (Prim.IsHidden) {

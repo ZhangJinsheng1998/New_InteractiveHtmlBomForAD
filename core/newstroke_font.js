@@ -14062,6 +14062,11 @@ mergeFont.arr5 = halfwidthAndFullwidthForms;
       index = "?".charCodeAt(0) - 32;
     }
     var glyph_str = newStrokeFont[index];
+    if (glyph_str === undefined) {
+      // char outside the available glyph table -> fall back to "?"
+      newStrokeFont = mergeFont.arr1;
+      glyph_str = newStrokeFont["?".charCodeAt(0) - 32];
+    }
     var coord;
     var len = glyph_str.length;
     for (var i = 0; i < len; i += 2) {

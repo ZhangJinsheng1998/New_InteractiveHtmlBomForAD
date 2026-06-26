@@ -4,7 +4,6 @@
 
 将[InteractiveHtmlBom](https://github.com/openscopeproject/InteractiveHtmlBom)这个插件作了一些修改，使其能在AD中运行，这里只实现基础的功能，更多的功能请参考原项目。
 
-到右边的[Releases](https://github.com/lianlian33/InteractiveHtmlBomForAD/releases)或到网盘下载http://luc33.ys168.com/ 密码123b
 
 ### 安装和使用 Installation and Usage 
  1. 运行一次Initianlize.bat
@@ -51,9 +50,3 @@
    - 在缺少 `config.ini` 时，`PcbOutlineMech1` 默认值由 `false`（Keep-Out Layer）改为 `true`（Mechanical 1），
      避免板框轮廓取不到而缺失。
 
-#### 注意事项
-
-- 修改 `core/`、`ecad/`、`tools/`、`modules-lite/` 下的文件后，**必须重新运行 `Initialize.bat`** 重新拼接 `dist/InteractiveHtmlBomForAD.js`；修改 `web/` 下的文件则不需要（由 `main()` 运行时直接读取并嵌入 html）。
-- 改完后需在 AD 中重新加载脚本工程并重新运行 `main()` 生成新的 html，旧 html 不会自动更新。
-- `dist` 会被 AD 的 JScript 引擎直接加载，该引擎按单字节解析，**进入 `dist` 的源文件（`core/`、`ecad/`、`tools/`）注释必须保持纯 ASCII**，写中文会导致加载时报「缺少 ';'」语法错误。中文注释只放在 `web/` 下的文件里。
-- `UnInitialize.bat` 是反初始化/清理工具，会清空 `dist` 与 `rootPath.js`、删除 `config.ini` 等，日常使用前**不要**运行它。

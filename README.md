@@ -60,3 +60,8 @@
 
 8. **补充 MIT LICENSE**，保留原项目（openscopeproject）与 AD 移植作者的署名。
 
+9. **后端解析整体容错（`ecad/AD10.js`）**
+   - `parsePcb` 的 5 个主解析循环（板框、元件、自由焊盘/过孔、丝印、铜箔/敷铜）全部加 `try/catch`：
+     单个元件/图元解析失败时只跳过它自己并计数，不再中断整张 PCB 的生成。
+   - 生成结束后若有跳过，会弹窗提示 `Warning: N object(s) failed to parse and were skipped.`，方便排查。
+

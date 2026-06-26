@@ -78,7 +78,8 @@ function get_bbox(Prim) {
 /// 
 function parsePcb(config) {
     //"use strict";
-    var pcb = {}; 
+    var pcb = {};
+    var skipCount = 0;  // objects skipped due to parse errors
     pcb["pcbdata"] = {};
     pcb["tracks"] = [];
     pcb["texts"] = [];
@@ -585,13 +586,17 @@ function parsePcb(config) {
         Iter.AddFilter_Method(eProcessAll);
         Prim = Iter.FirstPCBObject;
         while (Prim != null) {
-            switch (Prim.ObjectId) {
-                case eArcObject:
-                    edges.push(parseArc(Prim));
-                    break;
-                case eTrackObject:
-                    edges.push(parseTrack(Prim));
-                    break;
+            try {
+                switch (Prim.ObjectId) {
+                    case eArcObject:
+                        edges.push(parseArc(Prim));
+                        break;
+                    case eTrackObject:
+                        edges.push(parseTrack(Prim));
+                        break;
+                }
+            } catch (e) {
+                skipCount++;
             }
             Prim = Iter.NextPCBObject;
         }
@@ -821,7 +826,11 @@ function parsePcb(config) {
     Iter.AddFilter_Method(eProcessAll);
     Prim = Iter.FirstPCBObject;
     while (Prim != null) {
-        pcb.modules.push(parseComponent(Prim));
+        try {
+            pcb.modules.push(parseComponent(Prim));
+        } catch (e) {
+            skipCount++;
+        }
         Prim = Iter.NextPCBObject;
     }
     pcb.board.BoardIterator_Destroy(Iter);
@@ -841,18 +850,22 @@ function parsePcb(config) {
     Iter.AddFilter_Method(eProcessAll);
     Prim = Iter.FirstPCBObject;
     while (Prim != null) {
-        if (Prim.IsFreePrimitive) {
-            switch (Prim.ObjectId) {
-                case ePadObject:
-                    footprintNoBom.pads = footprintNoBom.pads.concat(parsePad(Prim));
-                    break;
-                case eViaObject:
-                    if (config.include.vias) {
-                        footprintNoBom.pads = footprintNoBom.pads.concat(parseVia(Prim));
-                    }
-                    break;
-                default:
+        try {
+            if (Prim.IsFreePrimitive) {
+                switch (Prim.ObjectId) {
+                    case ePadObject:
+                        footprintNoBom.pads = footprintNoBom.pads.concat(parsePad(Prim));
+                        break;
+                    case eViaObject:
+                        if (config.include.vias) {
+                            footprintNoBom.pads = footprintNoBom.pads.concat(parseVia(Prim));
+                        }
+                        break;
+                    default:
+                }
             }
+        } catch (e) {
+            skipCount++;
         }
         Prim = Iter.NextPCBObject;
     }
@@ -875,6 +888,7 @@ function parsePcb(config) {
     Iter.AddFilter_Method(eProcessAll);
     Prim = Iter.FirstPCBObject;
     while (Prim != null) {
+        try {
         switch (Prim.ObjectId) {
             case eTextObject:
                 pcb.texts.push(parseText(Prim));
@@ -892,6 +906,9 @@ function parsePcb(config) {
                 pcb.regions.push(parseRegion(Prim));
                 break;                  
             default:
+        }
+        } catch (e) {
+            skipCount++;
         }
         Prim = Iter.NextPCBObject;
     }
@@ -928,9 +945,10 @@ function parsePcb(config) {
     while (Prim != null) {
         if (Prim.InComponent || Prim.InPolygon) {
             Prim = Iter.NextPCBObject;
-            continue; 
+            continue;
         }
 
+        try {
         switch (Prim.ObjectId) {
             case eTrackObject:
                 draws.tracks.push(parseTrack(Prim));
@@ -956,6 +974,9 @@ function parsePcb(config) {
                 break;                   
             default:
         }    
+        } catch (e) {
+            skipCount++;
+        }
         Prim = Iter.NextPCBObject;
     }
     pcb.board.BoardIterator_Destroy(Iter);
@@ -972,6 +993,10 @@ function parsePcb(config) {
     pcb.pcbdata.font_data = parseTextToNewStrokeFont(str_text.join(""));
 
     PCBServer.PostProcess;
+
+    if (skipCount > 0) {
+        showmessage("Warning: " + skipCount + " object(s) failed to parse and were skipped.");
+    }
 
     return pcb;
 } 

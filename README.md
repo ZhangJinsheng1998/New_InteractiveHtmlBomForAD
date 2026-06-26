@@ -50,3 +50,13 @@
    - 在缺少 `config.ini` 时，`PcbOutlineMech1` 默认值由 `false`（Keep-Out Layer）改为 `true`（Mechanical 1），
      避免板框轮廓取不到而缺失。
 
+6. **1 脚（pin1）误标修正（`ecad/AD10.js`）**
+   - 原代码 `"A1".indexOf(Prim.Name)` 会把空焊盘名、以及名为 `"A"` 的焊盘也误标成 1 脚。
+   - 修正为仅当焊盘名是 `"1"` 或 `"A1"`（BGA）时标记 1 脚。
+
+7. **字体渲染加固，中文/特殊字符不再崩溃（`core/newstroke_font.js`）**
+   - `parseFontChar` 对字库未覆盖的字符回退成 `?`，不再因读取 `undefined` 而中断 AD 生成脚本。
+   - 字库本身已包含完整 CJK，丝印中文可正常渲染；超出范围的字符最多显示为 `?`。
+
+8. **补充 MIT LICENSE**，保留原项目（openscopeproject）与 AD 移植作者的署名。
+

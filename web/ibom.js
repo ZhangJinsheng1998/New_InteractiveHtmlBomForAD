@@ -7,6 +7,7 @@ var bomSortFunction = null;
 var currentSortColumn = null;
 var currentSortOrder = null;
 var currentHighlightedRowId;
+var lockedRowId = null;
 var highlightHandlers = [];
 var footprintIndexToHandler = {};
 var netsToHandler = {};
@@ -183,7 +184,20 @@ function createCheckboxChangeHandler(checkbox, references, row) {
   }
 }
 
+function setRowLock(rowid) {
+  if (lockedRowId && lockedRowId != rowid) {
+    var oldRow = document.getElementById(lockedRowId);
+    if (oldRow) oldRow.classList.remove("locked");
+  }
+  lockedRowId = rowid;
+  if (rowid) {
+    var row = document.getElementById(rowid);
+    if (row) row.classList.add("locked");
+  }
+}
+
 function clearHighlightedFootprints() {
+  setRowLock(null);
   if (currentHighlightedRowId) {
     document.getElementById(currentHighlightedRowId).classList.remove("highlighted");
     currentHighlightedRowId = null;
@@ -426,6 +440,7 @@ function populateBomBody() {
   footprintIndexToHandler = {};
   netsToHandler = {};
   currentHighlightedRowId = null;
+  lockedRowId = null;
   var first = true;
   if (settings.bommode == "netlist") {
     bomtable = pcbdata.nets.slice();
@@ -524,11 +539,20 @@ function populateBomBody() {
     }
     bom.appendChild(tr);
     let handler = createRowHighlightHandler(tr.id, references, netname);
-    tr.onmousemove = handler;
+    tr.onmousemove = function() {
+      // While a row is locked (clicked), hovering must not steal the highlight.
+      if (lockedRowId === null) handler();
+    };
     tr.onclick = function(e) {
       // Checkbox clicks toggle state; don't hijack them for zooming.
       if (e.target.tagName == "INPUT") return;
+      var rowid = e.currentTarget.id;
+      if (lockedRowId == rowid) {
+        setRowLock(null);
+        return;
+      }
       handler();
+      setRowLock(rowid);
       zoomToHighlightedFootprints();
     };
     highlightHandlers.push({
@@ -574,6 +598,7 @@ function highlightPreviousRow() {
       }
     }
   }
+  if (lockedRowId !== null) setRowLock(currentHighlightedRowId);
   smoothScrollToRow(currentHighlightedRowId);
 }
 
@@ -593,6 +618,7 @@ function highlightNextRow() {
       }
     }
   }
+  if (lockedRowId !== null) setRowLock(currentHighlightedRowId);
   smoothScrollToRow(currentHighlightedRowId);
 }
 
@@ -608,6 +634,8 @@ function footprintsClicked(footprintIndexes) {
     if (refIndex in footprintIndexToHandler) {
       lastClicked = refIndex;
       footprintIndexToHandler[refIndex]();
+      // A click on the PCB is explicit: move an existing lock along with it.
+      if (lockedRowId !== null) setRowLock(currentHighlightedRowId);
       smoothScrollToRow(currentHighlightedRowId);
       break;
     }
@@ -617,6 +645,7 @@ function footprintsClicked(footprintIndexes) {
 function netClicked(net) {
   if (net in netsToHandler) {
     netsToHandler[net]();
+    if (lockedRowId !== null) setRowLock(currentHighlightedRowId);
     smoothScrollToRow(currentHighlightedRowId);
   } else {
     clearHighlightedFootprints();

@@ -220,6 +220,18 @@ canvas:active {
   background-color: #226022;
 }
 
+.bom tr.locked:nth-child(n) {
+  background-color: #9e9;
+  outline: 2px solid #3a3;
+  outline-offset: -2px;
+}
+
+.dark .bom tr.locked:nth-child(n) {
+  background-color: #2e7d32;
+  outline: 2px solid #81c784;
+  outline-offset: -2px;
+}
+
 .bom tr:nth-child(even) {
   background-color: #f2f2f2;
 }

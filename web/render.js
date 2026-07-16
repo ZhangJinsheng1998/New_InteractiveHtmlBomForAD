@@ -775,6 +775,67 @@ function resetTransform(layerdict) {
   redrawCanvas(layerdict);
 }
 
+function calcFootprintsBbox(footprintIndexes) {
+  // Combined bounding box of the given footprints, in board-rotation space
+  // (same space the canvas transform math operates in).
+  var result = {
+    minx: Infinity,
+    miny: Infinity,
+    maxx: -Infinity,
+    maxy: -Infinity
+  };
+  for (var index of footprintIndexes) {
+    var footprint = pcbdata.footprints[index];
+    if (!footprint || !footprint.bbox) continue;
+    var b = footprint.bbox;
+    var corners = [
+      [b.relpos[0], b.relpos[1]],
+      [b.relpos[0] + b.size[0], b.relpos[1]],
+      [b.relpos[0], b.relpos[1] + b.size[1]],
+      [b.relpos[0] + b.size[0], b.relpos[1] + b.size[1]],
+    ];
+    for (var corner of corners) {
+      // local bbox corner -> board coords (inverse of pointWithinFootprintBbox)
+      var v = rotateVector(corner, -b.angle);
+      var p = rotateVector([b.pos[0] + v[0], b.pos[1] + v[1]], settings.boardRotation);
+      result.minx = Math.min(result.minx, p[0]);
+      result.miny = Math.min(result.miny, p[1]);
+      result.maxx = Math.max(result.maxx, p[0]);
+      result.maxy = Math.max(result.maxy, p[1]);
+    }
+  }
+  return result;
+}
+
+function zoomToBboxOnLayer(layerdict, bbox) {
+  var t = layerdict.transform;
+  var w = layerdict.bg.width;
+  var h = layerdict.bg.height;
+  if (!w || !h) return;
+  var bw = (bbox.maxx - bbox.minx) * t.s;
+  var bh = (bbox.maxy - bbox.miny) * t.s;
+  // Aim for the selection to fill about a third of the view.
+  var zoom = 0.33 * Math.min(w / Math.max(bw, 1), h / Math.max(bh, 1));
+  t.zoom = Math.min(Math.max(zoom, 1), 100);
+  var cx = (bbox.minx + bbox.maxx) / 2 * t.s;
+  var cy = (bbox.miny + bbox.maxy) / 2 * t.s;
+  if (layerdict.layer == "B") {
+    t.panx = w / (2 * t.zoom) + t.x + cx;
+  } else {
+    t.panx = w / (2 * t.zoom) - t.x - cx;
+  }
+  t.pany = h / (2 * t.zoom) - t.y - cy;
+  redrawCanvas(layerdict);
+}
+
+function zoomToHighlightedFootprints() {
+  if (highlightedFootprints.length == 0) return;
+  var bbox = calcFootprintsBbox(highlightedFootprints);
+  if (!isFinite(bbox.minx)) return;
+  zoomToBboxOnLayer(allcanvas.front, bbox);
+  zoomToBboxOnLayer(allcanvas.back, bbox);
+}
+
 function handlePointerUp(e, layerdict) {
   if (!e.hasOwnProperty("offsetX")) {
     // The polyfill doesn't set this properly

@@ -523,8 +523,14 @@ function populateBomBody() {
       }
     }
     bom.appendChild(tr);
-    var handler = createRowHighlightHandler(tr.id, references, netname);
+    let handler = createRowHighlightHandler(tr.id, references, netname);
     tr.onmousemove = handler;
+    tr.onclick = function(e) {
+      // Checkbox clicks toggle state; don't hijack them for zooming.
+      if (e.target.tagName == "INPUT") return;
+      handler();
+      zoomToHighlightedFootprints();
+    };
     highlightHandlers.push({
       id: tr.id,
       handler: handler,

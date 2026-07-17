@@ -817,9 +817,11 @@ function zoomToBboxOnLayer(layerdict, bbox) {
   if (!w || !h) return;
   var bw = (bbox.maxx - bbox.minx) * t.s;
   var bh = (bbox.maxy - bbox.miny) * t.s;
-  // Aim for the selection to fill about a third of the view.
+  // Aim for the selection to fill about a third of the view, but cap the
+  // zoom so surrounding landmarks stay visible (user adjustable).
+  var maxZoom = settings.clickZoomMax || 4;
   var zoom = 0.33 * Math.min(w / Math.max(bw, 1), h / Math.max(bh, 1));
-  t.zoom = Math.min(Math.max(zoom, 1), 100);
+  t.zoom = Math.min(Math.max(zoom, 1), maxZoom);
   var cx = (bbox.minx + bbox.maxx) / 2 * t.s;
   var cy = (bbox.miny + bbox.maxy) / 2 * t.s;
   if (layerdict.layer == "B") {

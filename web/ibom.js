@@ -1120,6 +1120,12 @@ function populateBinTable() {
   }
 }
 
+function setClickZoomMax(value) {
+  settings.clickZoomMax = parseFloat(value) || 4;
+  writeGlobalStorage("clickZoomMax", settings.clickZoomMax);
+  document.getElementById("clickZoomDegree").textContent = settings.clickZoomMax;
+}
+
 function setBinSize() {
   var rows = parseInt(document.getElementById("binRowsInput").value);
   var cols = parseInt(document.getElementById("binColsInput").value);
@@ -1800,6 +1806,9 @@ window.onload = function(e) {
   initDone = true;
   prepCheckboxes();
   initPartsBin();
+  settings.clickZoomMax = parseFloat(readGlobalStorage("clickZoomMax")) || 4;
+  document.getElementById("clickZoomMax").value = settings.clickZoomMax;
+  document.getElementById("clickZoomDegree").textContent = settings.clickZoomMax;
   // Triggers render
   changeBomLayout(settings.bomlayout);
 

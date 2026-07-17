@@ -232,6 +232,159 @@ canvas:active {
   outline-offset: -2px;
 }
 
+#bomdiv {
+  display: flex;
+  flex-direction: column;
+}
+
+.bom-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 60px;
+}
+
+#partsbin {
+  flex: 0 0 auto;
+  border-top: 2px solid #999;
+  background-color: inherit;
+}
+
+.bin-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.bin-header .bin-title {
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.bin-header input[type="number"] {
+  width: 44px;
+  font-size: 12px;
+}
+
+.bin-header .bin-hint {
+  color: #888;
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#binToggleBtn {
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+}
+
+.dark #binToggleBtn {
+  color: #eee;
+}
+
+#binScroll {
+  overflow: auto;
+  max-height: 35vh;
+  padding: 0 2px 2px 2px;
+}
+
+table.bin {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.bin th,
+.bin td {
+  border: 1px solid #aaa;
+  font-size: 10px;
+  font-family: Consolas, "DejaVu Sans Mono", monospace;
+  min-width: 34px;
+  max-width: 70px;
+  height: 20px;
+  padding: 0 2px;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bin th {
+  background-color: #ccc;
+  position: sticky;
+  z-index: 1;
+}
+
+.bin thead th {
+  top: 0;
+}
+
+.bin tbody th {
+  left: 0;
+}
+
+.bin thead th:first-child {
+  left: 0;
+  z-index: 2;
+}
+
+.bin td {
+  cursor: pointer;
+  background-color: #fff;
+}
+
+.bin td:hover {
+  background-color: #def;
+}
+
+.bin td.assigned {
+  background-color: #cfc;
+}
+
+.bin td.assigned:hover {
+  background-color: #beb;
+}
+
+.bin td.binhl {
+  background-color: #fc6;
+  outline: 2px solid #f80;
+  outline-offset: -2px;
+}
+
+.dark .bin th {
+  background-color: #3b4749;
+  border-color: #667;
+}
+
+.dark .bin td {
+  background-color: #252c30;
+  border-color: #556;
+  color: #eee;
+}
+
+.dark .bin td:hover {
+  background-color: #354045;
+}
+
+.dark .bin td.assigned {
+  background-color: #226022;
+}
+
+.dark .bin td.assigned:hover {
+  background-color: #2e7d32;
+}
+
+.dark .bin td.binhl {
+  background-color: #b26500;
+  outline: 2px solid #ffa726;
+  outline-offset: -2px;
+}
+
 .bom tr:nth-child(even) {
   background-color: #f2f2f2;
 }

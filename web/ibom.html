@@ -270,12 +270,30 @@
         </div>
       </div>
       <div id="dbg"></div>
-      <table class="bom">
-        <thead id="bomhead">
-        </thead>
-        <tbody id="bombody">
-        </tbody>
-      </table>
+      <div id="bomtablescroll" class="bom-scroll">
+        <table class="bom">
+          <thead id="bomhead">
+          </thead>
+          <tbody id="bombody">
+          </tbody>
+        </table>
+      </div>
+      <div id="partsbin" class="hideonprint">
+        <div class="bin-header">
+          <button id="binToggleBtn" onclick="toggleBin()" title="折叠/展开">&#9662;</button>
+          <span class="bin-title">元器件盒</span>
+          <label class="bin-size-label">行
+            <input id="binRowsInput" type="number" min="1" max="50" onchange="setBinSize()">
+          </label>
+          <label class="bin-size-label">列
+            <input id="binColsInput" type="number" min="1" max="50" onchange="setBinSize()">
+          </label>
+          <span class="bin-hint">点击 BOM 行后单击格子存放；双击格子手动编辑；右键清空格子</span>
+        </div>
+        <div id="binScroll" class="bin-scroll">
+          <table id="binTable" class="bin"></table>
+        </div>
+      </div>
     </div>
     <div id="canvasdiv" class="split split-horizontal">
       <div id="frontcanvas" class="split" touch-action="none" style="overflow: hidden">

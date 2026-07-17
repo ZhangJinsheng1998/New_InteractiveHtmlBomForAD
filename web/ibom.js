@@ -14,6 +14,7 @@ var netsToHandler = {};
 var highlightedFootprints = [];
 var highlightedNet = null;
 var lastClicked;
+var binAssignments = {}; // "row-col" -> "REF1,REF2,..."
 
 function dbg(html) {
   dbgdiv.innerHTML = html;
@@ -194,6 +195,7 @@ function setRowLock(rowid) {
     var row = document.getElementById(rowid);
     if (row) row.classList.add("locked");
   }
+  updateBinHighlight();
 }
 
 function clearHighlightedFootprints() {
@@ -625,6 +627,198 @@ function highlightNextRow() {
 function populateBomTable() {
   populateBomHeader();
   populateBomBody();
+  updateBinHighlight();
+}
+
+/* ------- 元器件盒 (parts bin) ------- */
+
+function highlightedRefNames() {
+  return highlightedFootprints.map(i => pcbdata.footprints[i].ref);
+}
+
+function saveBinAssignments() {
+  writeStorage("binAssignments", JSON.stringify(binAssignments));
+}
+
+function binRefsAt(key) {
+  return binAssignments[key] ? binAssignments[key].split(",") : [];
+}
+
+function findBinCellForRefs(refs) {
+  for (var key in binAssignments) {
+    var cellRefs = binAssignments[key].split(",");
+    for (var r of refs) {
+      if (cellRefs.includes(r)) return key;
+    }
+  }
+  return null;
+}
+
+// Remove the given refs from every cell so a ref can only live in one place.
+function binRemoveRefs(refs) {
+  for (var key in binAssignments) {
+    var remaining = binAssignments[key].split(",").filter(r => !refs.includes(r));
+    if (remaining.length == 0) {
+      delete binAssignments[key];
+    } else {
+      binAssignments[key] = remaining.join(",");
+    }
+  }
+}
+
+function updateBinHighlight() {
+  var table = document.getElementById("binTable");
+  if (!table) return;
+  for (var el of table.querySelectorAll("td.binhl")) {
+    el.classList.remove("binhl");
+  }
+  if (lockedRowId === null || highlightedFootprints.length == 0) return;
+  var key = findBinCellForRefs(highlightedRefNames());
+  if (key) {
+    var cell = document.getElementById("bincell-" + key);
+    if (cell) {
+      cell.classList.add("binhl");
+      cell.scrollIntoView({block: "nearest", inline: "nearest"});
+    }
+  }
+}
+
+function binCellClicked(key) {
+  if (lockedRowId !== null && highlightedFootprints.length > 0) {
+    // 有锁定行：把该行的元器件放进格子；点已存放它的格子则取出。
+    var refs = highlightedRefNames();
+    var refString = refs.join(",");
+    if (binAssignments[key] == refString) {
+      delete binAssignments[key];
+    } else {
+      binRemoveRefs(refs);
+      binAssignments[key] = refString;
+    }
+    saveBinAssignments();
+    populateBinTable();
+  } else {
+    // 无锁定行：点击已存放的格子反查 BOM 行并锁定、缩放。
+    var refs = binRefsAt(key);
+    for (var i = 0; i < pcbdata.footprints.length; i++) {
+      if (refs.includes(pcbdata.footprints[i].ref) && (i in footprintIndexToHandler)) {
+        footprintIndexToHandler[i]();
+        setRowLock(currentHighlightedRowId);
+        zoomToHighlightedFootprints();
+        smoothScrollToRow(currentHighlightedRowId);
+        break;
+      }
+    }
+  }
+  updateBinHighlight();
+}
+
+function binCellEdit(key) {
+  var input = prompt("输入该格存放的元器件位号（逗号分隔，留空清除）:", binAssignments[key] || "");
+  if (input === null) return;
+  var refs = input.split(",").map(s => s.trim()).filter(s => s);
+  binRemoveRefs(refs);
+  if (refs.length) {
+    binAssignments[key] = refs.join(",");
+  } else {
+    delete binAssignments[key];
+  }
+  saveBinAssignments();
+  populateBinTable();
+  updateBinHighlight();
+}
+
+function binCellClear(key) {
+  if (!binAssignments[key]) return;
+  delete binAssignments[key];
+  saveBinAssignments();
+  populateBinTable();
+  updateBinHighlight();
+}
+
+function populateBinTable() {
+  var table = document.getElementById("binTable");
+  if (!table) return;
+  table.innerHTML = "";
+  var thead = document.createElement("THEAD");
+  var tr = document.createElement("TR");
+  tr.appendChild(document.createElement("TH")); // corner
+  for (var c = 1; c <= settings.binCols; c++) {
+    var th = document.createElement("TH");
+    th.textContent = c;
+    tr.appendChild(th);
+  }
+  thead.appendChild(tr);
+  table.appendChild(thead);
+  var tbody = document.createElement("TBODY");
+  for (var r = 1; r <= settings.binRows; r++) {
+    tr = document.createElement("TR");
+    var th = document.createElement("TH");
+    th.textContent = r;
+    tr.appendChild(th);
+    for (var c = 1; c <= settings.binCols; c++) {
+      let key = r + "-" + c;
+      let td = document.createElement("TD");
+      td.id = "bincell-" + key;
+      var refs = binRefsAt(key);
+      if (refs.length) {
+        td.classList.add("assigned");
+        td.textContent = refs.length > 1 ? refs[0] + "+" + (refs.length - 1) : refs[0];
+        td.title = key.replace("-", "行") + "列: " + binAssignments[key];
+      } else {
+        td.title = key.replace("-", "行") + "列";
+      }
+      td.onclick = fancyDblClickHandler(td,
+        function() { binCellClicked(key); },
+        function() { binCellEdit(key); });
+      td.oncontextmenu = function(e) {
+        e.preventDefault();
+        binCellClear(key);
+      };
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+}
+
+function setBinSize() {
+  var rows = parseInt(document.getElementById("binRowsInput").value);
+  var cols = parseInt(document.getElementById("binColsInput").value);
+  if (rows >= 1 && rows <= 50) {
+    settings.binRows = rows;
+    writeStorage("binRows", rows);
+  }
+  if (cols >= 1 && cols <= 50) {
+    settings.binCols = cols;
+    writeStorage("binCols", cols);
+  }
+  populateBinTable();
+  updateBinHighlight();
+}
+
+function toggleBin() {
+  var scroll = document.getElementById("binScroll");
+  var collapsed = scroll.style.display != "none";
+  scroll.style.display = collapsed ? "none" : "";
+  document.getElementById("binToggleBtn").innerHTML = collapsed ? "&#9656;" : "&#9662;";
+  writeStorage("binCollapsed", collapsed);
+}
+
+function initPartsBin() {
+  settings.binRows = parseInt(readStorage("binRows")) || 8;
+  settings.binCols = parseInt(readStorage("binCols")) || 16;
+  try {
+    binAssignments = JSON.parse(readStorage("binAssignments")) || {};
+  } catch (e) {
+    binAssignments = {};
+  }
+  document.getElementById("binRowsInput").value = settings.binRows;
+  document.getElementById("binColsInput").value = settings.binCols;
+  if (readStorage("binCollapsed") == "true") {
+    document.getElementById("binScroll").style.display = "none";
+    document.getElementById("binToggleBtn").innerHTML = "&#9656;";
+  }
+  populateBinTable();
 }
 
 function footprintsClicked(footprintIndexes) {
@@ -1059,6 +1253,7 @@ window.onload = function(e) {
   }
   initDone = true;
   prepCheckboxes();
+  initPartsBin();
   // Triggers render
   changeBomLayout(settings.bomlayout);
 

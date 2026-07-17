@@ -686,6 +686,9 @@ function canonScalar(s) {
     return "h" + roundNum(parseFloat(m[1] + "." + m[3]) * {n: 1, u: 1e3, m: 1e6}[m[2]]);
   if ((m = s.match(/^(\d*\.?\d+)([num])h$/)))
     return "h" + roundNum(parseFloat(m[1]) * {n: 1, u: 1e3, m: 1e6}[m[2]]);
+  // 三位数容量代码，统一按电容解读（不作电阻）：101=100pF、104=100nF、475=4.7uF
+  if ((m = s.match(/^(\d\d)(\d)$/)))
+    return "f" + roundNum(parseInt(m[1], 10) * Math.pow(10, parseInt(m[2], 10)));
   return null;
 }
 
@@ -699,10 +702,12 @@ function canonValueParts(value) {
   s = s.replace(/[^a-z0-9.μ]/g, "");
   var main = canonScalar(s);
   if (main !== null) return {main: main, volt: ""};
-  var re = /(\d+(?:\.\d+)?)(kv|v)/g;
-  var m;
-  while ((m = re.exec(s)) !== null) {
-    var rest = s.slice(0, m.index) + s.slice(m.index + m[0].length);
+  // 在每个数字位置尝试拆出电压（避免 10450v 这类连写被贪婪匹配整段吃掉），
+  // 取剩余部分能解析成阻/容/感值的那种拆法。
+  for (var j = 0; j < s.length; j++) {
+    var m = s.slice(j).match(/^(\d+(?:\.\d+)?)(kv|v)/);
+    if (!m) continue;
+    var rest = s.slice(0, j) + s.slice(j + m[0].length);
     var restMain = canonScalar(rest);
     if (restMain !== null) {
       return {

@@ -649,8 +649,69 @@ function currentHighlightedSpec() {
   return footprintSpecs[highlightedFootprints[0]] || null;
 }
 
-function specsEqual(a, b) {
-  return !!a && !!b && a[0] == b[0] && a[1] == b[1];
+// ---- 模糊匹配：值归一化 + 封装尺寸提取 ----
+// 目的：盒子里写「1K0603」能匹配 BOM 里 值=1K / 封装=R0603_L 的行；
+// 不同板卡的封装命名（R1206_L / R1206-HP_L）、阻值写法（510mR / 0.51R / 4K7 / 4.7K）都能对上。
+
+function roundNum(x) {
+  return parseFloat(x.toPrecision(12));
+}
+
+function canonValue(value) {
+  var s = String(value).toLowerCase();
+  s = s.replace(/ohm|[ωΩ]|欧姆|欧/g, "o");
+  s = s.replace(/[^a-z0-9.μ]/g, "");
+  var m;
+  // 电阻，字母作小数点：4k7 / 4r7 / 4m7
+  if ((m = s.match(/^(\d+)([rkm])(\d+)o?$/)))
+    return "r" + roundNum(parseFloat(m[1] + "." + m[3]) * {r: 1, k: 1e3, m: 1e6}[m[2]]);
+  // 毫欧：510mr / 5mΩ
+  if ((m = s.match(/^(\d*\.?\d+)m[ro]$/)))
+    return "r" + roundNum(parseFloat(m[1]) / 1000);
+  // 欧姆：100r / 100Ω / 0.005r
+  if ((m = s.match(/^(\d*\.?\d+)[ro]$/)))
+    return "r" + roundNum(parseFloat(m[1]));
+  // 千欧：4.7k / 68ko
+  if ((m = s.match(/^(\d*\.?\d+)ko?$/)))
+    return "r" + roundNum(parseFloat(m[1]) * 1e3);
+  // 兆欧：1m / 3m
+  if ((m = s.match(/^(\d*\.?\d+)m$/)))
+    return "r" + roundNum(parseFloat(m[1]) * 1e6);
+  // 电容（pF 基准），字母作小数点：4n7 / 4u7f
+  if ((m = s.match(/^(\d+)([pnuμ])(\d+)f?$/)))
+    return "f" + roundNum(parseFloat(m[1] + "." + m[3]) * {p: 1, n: 1e3, u: 1e6, "μ": 1e6}[m[2]]);
+  // 电容：22p / 100nf / 10uf / 0.1μf
+  if ((m = s.match(/^(\d*\.?\d+)([pnuμ])f?$/)))
+    return "f" + roundNum(parseFloat(m[1]) * {p: 1, n: 1e3, u: 1e6, "μ": 1e6}[m[2]]);
+  // 电感（nH 基准）：4u7h / 10uh / 2.2mh / 100nh
+  if ((m = s.match(/^(\d+)([num])(\d+)h$/)))
+    return "h" + roundNum(parseFloat(m[1] + "." + m[3]) * {n: 1, u: 1e3, m: 1e6}[m[2]]);
+  if ((m = s.match(/^(\d*\.?\d+)([num])h$/)))
+    return "h" + roundNum(parseFloat(m[1]) * {n: 1, u: 1e3, m: 1e6}[m[2]]);
+  return s;
+}
+
+var binSizeTokens = ["0201", "0402", "0603", "0805", "1206", "1210", "1808", "1812", "2010", "2220", "2512"];
+
+function canonPackage(footprint) {
+  var s = String(footprint).toLowerCase().replace(/[^a-z0-9]/g, "");
+  for (var t of binSizeTokens) {
+    if (s.includes(t)) return t;
+  }
+  return s;
+}
+
+function packagesMatch(a, b) {
+  var ca = canonPackage(a);
+  var cb = canonPackage(b);
+  if (!ca || !cb) return true; // 空封装视为通配
+  return ca == cb || ca.includes(cb) || cb.includes(ca);
+}
+
+function specsMatch(a, b) {
+  return !!a && !!b &&
+    canonValue(a[0]) == canonValue(b[0]) &&
+    packagesMatch(a[1], b[1]);
 }
 
 function saveBinAssignments() {
@@ -659,7 +720,7 @@ function saveBinAssignments() {
 
 function findBinCellForSpec(spec) {
   for (var key in binAssignments) {
-    if (specsEqual(binAssignments[key], spec)) return key;
+    if (specsMatch(binAssignments[key], spec)) return key;
   }
   return null;
 }
@@ -667,7 +728,7 @@ function findBinCellForSpec(spec) {
 // 同一种元器件（值+封装）只存放在一个格子里。
 function binRemoveSpec(spec) {
   for (var key in binAssignments) {
-    if (specsEqual(binAssignments[key], spec)) delete binAssignments[key];
+    if (specsMatch(binAssignments[key], spec)) delete binAssignments[key];
   }
 }
 
@@ -692,7 +753,7 @@ function binCellClicked(key) {
   var spec = (lockedRowId !== null) ? currentHighlightedSpec() : null;
   if (spec) {
     // 有锁定行：把该行的元器件（值+封装）放进格子；点已存放它的格子则取出。
-    if (specsEqual(binAssignments[key], spec)) {
+    if (specsMatch(binAssignments[key], spec)) {
       delete binAssignments[key];
     } else {
       binRemoveSpec(spec);
@@ -705,7 +766,7 @@ function binCellClicked(key) {
     var cellSpec = binAssignments[key];
     if (cellSpec) {
       for (var i in footprintIndexToHandler) {
-        if (specsEqual(footprintSpecs[i], cellSpec)) {
+        if (specsMatch(footprintSpecs[i], cellSpec)) {
           footprintIndexToHandler[i]();
           setRowLock(currentHighlightedRowId);
           zoomToHighlightedFootprints();
@@ -721,16 +782,22 @@ function binCellClicked(key) {
 function binCellEdit(key) {
   var current = binAssignments[key] ?
     binAssignments[key][0] + " | " + binAssignments[key][1] : "";
-  var input = prompt("输入该格存放的元器件，格式：值 | 封装（留空清除）:", current);
+  var input = prompt("输入该格存放的元器件，如 1K0603、100nF、SW6306，或「值 | 封装」（留空清除）:", current);
   if (input === null) return;
   input = input.trim();
   if (!input) {
     delete binAssignments[key];
   } else {
+    var spec;
     var sep = input.indexOf("|");
-    var spec = sep >= 0 ?
-      [input.slice(0, sep).trim(), input.slice(sep + 1).trim()] :
-      [input, ""];
+    if (sep >= 0) {
+      spec = [input.slice(0, sep).trim(), input.slice(sep + 1).trim()];
+    } else {
+      // 「1K0603」连写：把结尾的封装尺寸码拆出来
+      var m = input.replace(/\s+/g, "").match(
+        new RegExp("^(.+?)(" + binSizeTokens.join("|") + ")$"));
+      spec = m ? [m[1], m[2]] : [input, ""];
+    }
     binRemoveSpec(spec);
     binAssignments[key] = spec;
   }

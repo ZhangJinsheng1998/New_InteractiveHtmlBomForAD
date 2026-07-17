@@ -759,9 +759,20 @@ function formatValueParts(parts) {
   return text;
 }
 
-// 按常见型号前缀猜器件类型（仅提示用，不参与匹配）
+var binUserTypes = {}; // 用户自选类型库：归一化型号 -> 类型，全局共用
+
+function binTypeKey(value) {
+  return String(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function saveBinUserTypes() {
+  writeGlobalStorage("binUserTypes", JSON.stringify(binUserTypes));
+}
+
+// 按常见型号前缀猜器件类型（仅提示用，不参与匹配）；用户类型库优先
 function guessComponentType(value) {
-  var s = String(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+  var s = binTypeKey(value);
+  if (binUserTypes[s]) return binUserTypes[s];
   if (/pmos/.test(s)) return "PMOS";
   if (/nmos/.test(s)) return "NMOS";
   if (/^(ao3401|ao3407|ao3415|si2301|si2305|irlml6402|cj2301)/.test(s)) return "PMOS";
@@ -900,12 +911,40 @@ function binCellEdit(key) {
 function binEditUpdatePreview() {
   var text = document.getElementById("binEditInput").value.trim();
   var el = document.getElementById("binEditPreview");
+  var typeSel = document.getElementById("binEditType");
+  var note = document.getElementById("binEditTypeNote");
   if (!text) {
     el.textContent = "留空 = 清除该格";
+    typeSel.value = "";
+    typeSel.disabled = true;
+    note.textContent = "";
     return;
   }
   var spec = binParseInput(text);
+  var parts = canonValueParts(spec[0]);
+  var parsed = formatValueParts(parts);
+  if (parsed) {
+    // 阻容感数值已解析，类型锁定
+    typeSel.value = {r: "电阻", f: "电容", h: "电感"}[parts.main[0]];
+    typeSel.disabled = true;
+    note.textContent = "已自动识别";
+  } else {
+    typeSel.disabled = false;
+    typeSel.value = binUserTypes[binTypeKey(spec[0])] || "";
+    note.textContent = "认不出时可手选，会记住";
+  }
   el.textContent = "识别为: " + describeSpecValue(spec[0]) +
+    (spec[1] ? " · " + spec[1] : "");
+}
+
+// 手选类型后即时更新预览（仅型号类值可选）
+function binEditTypeChanged() {
+  var text = document.getElementById("binEditInput").value.trim();
+  if (!text) return;
+  var spec = binParseInput(text);
+  var t = document.getElementById("binEditType").value;
+  document.getElementById("binEditPreview").textContent =
+    "识别为: " + (t ? t + " " : "") + spec[0] + "（按字面匹配）" +
     (spec[1] ? " · " + spec[1] : "");
 }
 
@@ -916,6 +955,17 @@ function binEditConfirm() {
     delete binAssignments[binEditKey];
   } else {
     var spec = binParseInput(text);
+    // 手选的类型记进全局类型库（"自动" = 清除记录，恢复内置判断）
+    var typeSel = document.getElementById("binEditType");
+    if (!typeSel.disabled) {
+      var k = binTypeKey(spec[0]);
+      if (typeSel.value) {
+        binUserTypes[k] = typeSel.value;
+      } else {
+        delete binUserTypes[k];
+      }
+      saveBinUserTypes();
+    }
     binRemoveSpec(spec);
     binAssignments[binEditKey] = spec;
   }
@@ -1029,6 +1079,14 @@ function initPartsBin() {
     document.getElementById("binScroll").style.display = "none";
     document.getElementById("binToggleBtn").innerHTML = "&#9656;";
   }
+  try {
+    var storedTypes = JSON.parse(readGlobalStorage("binUserTypes"));
+    for (var tk in storedTypes) {
+      if (typeof storedTypes[tk] == "string") binUserTypes[tk] = storedTypes[tk];
+    }
+  } catch (e) {
+    // ignore malformed stored data
+  }
   var editInput = document.getElementById("binEditInput");
   editInput.oninput = binEditUpdatePreview;
   editInput.onkeydown = function(e) {
@@ -1036,6 +1094,7 @@ function initPartsBin() {
     if (e.key == "Enter") binEditConfirm();
     if (e.key == "Escape") binEditCancel();
   };
+  document.getElementById("binEditType").onchange = binEditTypeChanged;
   populateBinTable();
 }
 

@@ -299,6 +299,22 @@
           <div id="binEditTitle" class="bin-edit-title">编辑格子</div>
           <div class="bin-edit-hint">如 1K0603、10uF25V0805、SW6306，或「值 | 封装」；留空清除</div>
           <input id="binEditInput" type="text" autocomplete="off">
+          <div class="bin-edit-type-row">
+            <span>类型:</span>
+            <select id="binEditType">
+              <option value="">自动</option>
+              <option>电阻</option>
+              <option>电容</option>
+              <option>电感</option>
+              <option>二极管</option>
+              <option>NMOS</option>
+              <option>PMOS</option>
+              <option>三极管</option>
+              <option>LED</option>
+              <option>芯片</option>
+            </select>
+            <span id="binEditTypeNote" class="bin-edit-hint" style="margin-bottom: 0;"></span>
+          </div>
           <div id="binEditPreview" class="bin-edit-preview"></div>
           <div class="bin-edit-buttons">
             <button class="bin-edit-btn" onclick="binEditConfirm()">确定</button>

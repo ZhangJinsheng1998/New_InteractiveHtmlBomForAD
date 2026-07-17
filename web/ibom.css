@@ -447,6 +447,32 @@ table.bin {
   border-color: #667;
 }
 
+.bin-edit-type-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+#binEditType {
+  font-size: 12px;
+  padding: 2px 4px;
+  border: 1px solid #888;
+  border-radius: 4px;
+  background-color: white;
+}
+
+.dark #binEditType {
+  background-color: #313b40;
+  color: #eee;
+  border-color: #667;
+}
+
+#binEditType:disabled {
+  opacity: 0.6;
+}
+
 .bin-edit-preview {
   min-height: 18px;
   margin: 8px 0;

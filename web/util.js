@@ -35,6 +35,23 @@ function writeStorage(key, value) {
   }
 }
 
+// Global storage: shared by every generated ibom page, not tied to a board.
+var globalStoragePrefix = 'InteractiveHtmlBom_global__#';
+
+function readGlobalStorage(key) {
+  if (storage) {
+    return storage.getItem(globalStoragePrefix + key);
+  } else {
+    return null;
+  }
+}
+
+function writeGlobalStorage(key, value) {
+  if (storage) {
+    storage.setItem(globalStoragePrefix + key, value);
+  }
+}
+
 function fancyDblClickHandler(el, onsingle, ondouble) {
   return function() {
     if (el.getAttribute("data-dblclick") == null) {

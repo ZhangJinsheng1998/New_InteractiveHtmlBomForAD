@@ -281,11 +281,11 @@ canvas:active {
   border: none;
   cursor: pointer;
   font-size: 14px;
+  font-weight: bolder;
+  width: auto;
+  height: auto;
   padding: 0 2px;
-}
-
-.dark #binToggleBtn {
-  color: #eee;
+  color: inherit;
 }
 
 #binScroll {
@@ -297,13 +297,13 @@ canvas:active {
 table.bin {
   border-collapse: separate;
   border-spacing: 0;
+  font-family: Consolas, "DejaVu Sans Mono", Monaco, monospace;
+  font-size: 8pt;
 }
 
 .bin th,
 .bin td {
-  border: 1px solid #aaa;
-  font-size: 10px;
-  font-family: Consolas, "DejaVu Sans Mono", monospace;
+  border: 1px solid black;
   min-width: 34px;
   max-width: 70px;
   height: 20px;
@@ -314,10 +314,20 @@ table.bin {
   text-overflow: ellipsis;
 }
 
+.dark .bin th,
+.dark .bin td {
+  border: 1px solid #777;
+}
+
 .bin th {
-  background-color: #ccc;
+  background-color: #CCCCCC;
+  background-clip: padding-box;
   position: sticky;
   z-index: 1;
+}
+
+.dark .bin th {
+  background-color: #3b4749;
 }
 
 .bin thead th {
@@ -335,53 +345,48 @@ table.bin {
 
 .bin td {
   cursor: pointer;
-  background-color: #fff;
+  background-color: white;
+  transition: background-color 0.2s;
+}
+
+.dark .bin td {
+  background-color: #252c30;
+  color: #eee;
 }
 
 .bin td:hover {
-  background-color: #def;
+  background-color: #f2f2f2;
+}
+
+.dark .bin td:hover {
+  background-color: #313b40;
 }
 
 .bin td.assigned {
   background-color: #cfc;
 }
 
-.bin td.assigned:hover {
-  background-color: #beb;
-}
-
-.bin td.binhl {
-  background-color: #fc6;
-  outline: 2px solid #f80;
-  outline-offset: -2px;
-}
-
-.dark .bin th {
-  background-color: #3b4749;
-  border-color: #667;
-}
-
-.dark .bin td {
-  background-color: #252c30;
-  border-color: #556;
-  color: #eee;
-}
-
-.dark .bin td:hover {
-  background-color: #354045;
-}
-
 .dark .bin td.assigned {
   background-color: #226022;
 }
 
+.bin td.assigned:hover {
+  background-color: #beb;
+}
+
 .dark .bin td.assigned:hover {
-  background-color: #2e7d32;
+  background-color: #2a7a2a;
+}
+
+.bin td.binhl {
+  background-color: #9e9;
+  outline: 2px solid #3a3;
+  outline-offset: -2px;
 }
 
 .dark .bin td.binhl {
-  background-color: #b26500;
-  outline: 2px solid #ffa726;
+  background-color: #2e7d32;
+  outline: 2px solid #81c784;
   outline-offset: -2px;
 }
 

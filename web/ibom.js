@@ -14,7 +14,7 @@ var netsToHandler = {};
 var highlightedFootprints = [];
 var highlightedNet = null;
 var lastClicked;
-var binAssignments = {}; // "row-col" -> "REF1,REF2,..."
+var binAssignments = {}; // "row-col" -> [value, footprint]，全局共用
 
 function dbg(html) {
   dbgdiv.innerHTML = html;
@@ -631,38 +631,43 @@ function populateBomTable() {
 }
 
 /* ------- 元器件盒 (parts bin) ------- */
+// 全局共用：格子按「值+封装」存放，所有板卡的页面共享同一个盒子。
 
-function highlightedRefNames() {
-  return highlightedFootprints.map(i => pcbdata.footprints[i].ref);
+var footprintSpecs = {}; // footprint index -> [value, footprint]
+
+function initFootprintSpecs() {
+  footprintSpecs = {};
+  for (var entry of pcbdata.bom.both) {
+    for (var ref of entry[3]) {
+      footprintSpecs[ref[1]] = [entry[1], entry[2]];
+    }
+  }
+}
+
+function currentHighlightedSpec() {
+  if (highlightedFootprints.length == 0) return null;
+  return footprintSpecs[highlightedFootprints[0]] || null;
+}
+
+function specsEqual(a, b) {
+  return !!a && !!b && a[0] == b[0] && a[1] == b[1];
 }
 
 function saveBinAssignments() {
-  writeStorage("binAssignments", JSON.stringify(binAssignments));
+  writeGlobalStorage("binAssignments", JSON.stringify(binAssignments));
 }
 
-function binRefsAt(key) {
-  return binAssignments[key] ? binAssignments[key].split(",") : [];
-}
-
-function findBinCellForRefs(refs) {
+function findBinCellForSpec(spec) {
   for (var key in binAssignments) {
-    var cellRefs = binAssignments[key].split(",");
-    for (var r of refs) {
-      if (cellRefs.includes(r)) return key;
-    }
+    if (specsEqual(binAssignments[key], spec)) return key;
   }
   return null;
 }
 
-// Remove the given refs from every cell so a ref can only live in one place.
-function binRemoveRefs(refs) {
+// 同一种元器件（值+封装）只存放在一个格子里。
+function binRemoveSpec(spec) {
   for (var key in binAssignments) {
-    var remaining = binAssignments[key].split(",").filter(r => !refs.includes(r));
-    if (remaining.length == 0) {
-      delete binAssignments[key];
-    } else {
-      binAssignments[key] = remaining.join(",");
-    }
+    if (specsEqual(binAssignments[key], spec)) delete binAssignments[key];
   }
 }
 
@@ -672,8 +677,8 @@ function updateBinHighlight() {
   for (var el of table.querySelectorAll("td.binhl")) {
     el.classList.remove("binhl");
   }
-  if (lockedRowId === null || highlightedFootprints.length == 0) return;
-  var key = findBinCellForRefs(highlightedRefNames());
+  if (lockedRowId === null) return;
+  var key = findBinCellForSpec(currentHighlightedSpec());
   if (key) {
     var cell = document.getElementById("bincell-" + key);
     if (cell) {
@@ -684,28 +689,29 @@ function updateBinHighlight() {
 }
 
 function binCellClicked(key) {
-  if (lockedRowId !== null && highlightedFootprints.length > 0) {
-    // 有锁定行：把该行的元器件放进格子；点已存放它的格子则取出。
-    var refs = highlightedRefNames();
-    var refString = refs.join(",");
-    if (binAssignments[key] == refString) {
+  var spec = (lockedRowId !== null) ? currentHighlightedSpec() : null;
+  if (spec) {
+    // 有锁定行：把该行的元器件（值+封装）放进格子；点已存放它的格子则取出。
+    if (specsEqual(binAssignments[key], spec)) {
       delete binAssignments[key];
     } else {
-      binRemoveRefs(refs);
-      binAssignments[key] = refString;
+      binRemoveSpec(spec);
+      binAssignments[key] = spec;
     }
     saveBinAssignments();
     populateBinTable();
   } else {
     // 无锁定行：点击已存放的格子反查 BOM 行并锁定、缩放。
-    var refs = binRefsAt(key);
-    for (var i = 0; i < pcbdata.footprints.length; i++) {
-      if (refs.includes(pcbdata.footprints[i].ref) && (i in footprintIndexToHandler)) {
-        footprintIndexToHandler[i]();
-        setRowLock(currentHighlightedRowId);
-        zoomToHighlightedFootprints();
-        smoothScrollToRow(currentHighlightedRowId);
-        break;
+    var cellSpec = binAssignments[key];
+    if (cellSpec) {
+      for (var i in footprintIndexToHandler) {
+        if (specsEqual(footprintSpecs[i], cellSpec)) {
+          footprintIndexToHandler[i]();
+          setRowLock(currentHighlightedRowId);
+          zoomToHighlightedFootprints();
+          smoothScrollToRow(currentHighlightedRowId);
+          break;
+        }
       }
     }
   }
@@ -713,14 +719,20 @@ function binCellClicked(key) {
 }
 
 function binCellEdit(key) {
-  var input = prompt("输入该格存放的元器件位号（逗号分隔，留空清除）:", binAssignments[key] || "");
+  var current = binAssignments[key] ?
+    binAssignments[key][0] + " | " + binAssignments[key][1] : "";
+  var input = prompt("输入该格存放的元器件，格式：值 | 封装（留空清除）:", current);
   if (input === null) return;
-  var refs = input.split(",").map(s => s.trim()).filter(s => s);
-  binRemoveRefs(refs);
-  if (refs.length) {
-    binAssignments[key] = refs.join(",");
-  } else {
+  input = input.trim();
+  if (!input) {
     delete binAssignments[key];
+  } else {
+    var sep = input.indexOf("|");
+    var spec = sep >= 0 ?
+      [input.slice(0, sep).trim(), input.slice(sep + 1).trim()] :
+      [input, ""];
+    binRemoveSpec(spec);
+    binAssignments[key] = spec;
   }
   saveBinAssignments();
   populateBinTable();
@@ -759,11 +771,11 @@ function populateBinTable() {
       let key = r + "-" + c;
       let td = document.createElement("TD");
       td.id = "bincell-" + key;
-      var refs = binRefsAt(key);
-      if (refs.length) {
+      var spec = binAssignments[key];
+      if (spec) {
         td.classList.add("assigned");
-        td.textContent = refs.length > 1 ? refs[0] + "+" + (refs.length - 1) : refs[0];
-        td.title = key.replace("-", "行") + "列: " + binAssignments[key];
+        td.textContent = spec[0];
+        td.title = key.replace("-", "行") + "列: " + spec[0] + " | " + spec[1];
       } else {
         td.title = key.replace("-", "行") + "列";
       }
@@ -786,11 +798,11 @@ function setBinSize() {
   var cols = parseInt(document.getElementById("binColsInput").value);
   if (rows >= 1 && rows <= 50) {
     settings.binRows = rows;
-    writeStorage("binRows", rows);
+    writeGlobalStorage("binRows", rows);
   }
   if (cols >= 1 && cols <= 50) {
     settings.binCols = cols;
-    writeStorage("binCols", cols);
+    writeGlobalStorage("binCols", cols);
   }
   populateBinTable();
   updateBinHighlight();
@@ -801,20 +813,27 @@ function toggleBin() {
   var collapsed = scroll.style.display != "none";
   scroll.style.display = collapsed ? "none" : "";
   document.getElementById("binToggleBtn").innerHTML = collapsed ? "&#9656;" : "&#9662;";
-  writeStorage("binCollapsed", collapsed);
+  writeGlobalStorage("binCollapsed", collapsed);
 }
 
 function initPartsBin() {
-  settings.binRows = parseInt(readStorage("binRows")) || 8;
-  settings.binCols = parseInt(readStorage("binCols")) || 16;
+  initFootprintSpecs();
+  settings.binRows = parseInt(readGlobalStorage("binRows")) || 8;
+  settings.binCols = parseInt(readGlobalStorage("binCols")) || 16;
+  binAssignments = {};
   try {
-    binAssignments = JSON.parse(readStorage("binAssignments")) || {};
+    var stored = JSON.parse(readGlobalStorage("binAssignments"));
+    for (var key in stored) {
+      if (Array.isArray(stored[key]) && stored[key].length == 2) {
+        binAssignments[key] = stored[key];
+      }
+    }
   } catch (e) {
-    binAssignments = {};
+    // ignore malformed stored data
   }
   document.getElementById("binRowsInput").value = settings.binRows;
   document.getElementById("binColsInput").value = settings.binCols;
-  if (readStorage("binCollapsed") == "true") {
+  if (readGlobalStorage("binCollapsed") == "true") {
     document.getElementById("binScroll").style.display = "none";
     document.getElementById("binToggleBtn").innerHTML = "&#9656;";
   }

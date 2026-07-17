@@ -709,25 +709,36 @@ function canonValueParts(value) {
   var s = String(value).toLowerCase();
   // 已知器件型号（二极管/MOS/三极管）不做数值解析，避免 1N4148 被误读成 1.4148nF
   if (guessComponentType(value)) {
-    return {main: s.replace(/[^a-z0-9.μ]/g, ""), volt: ""};
+    return {main: s.replace(/[^a-z0-9.μ]/g, ""), volt: "", watt: ""};
+  }
+  // 分数瓦数（1/8W）要在符号清理前提取，斜杠会被清掉
+  var watt = "";
+  var fw = s.match(/(\d+)\s*\/\s*(\d+)\s*w/);
+  if (fw) {
+    watt = "w" + roundNum(parseInt(fw[1], 10) / parseInt(fw[2], 10));
+    s = s.replace(fw[0], "");
   }
   s = s.replace(/±?\d+(?:\.\d+)?%/g, "");            // 容差 ±10%
   s = s.replace(/x5r|x7r|x7s|y5v|np0|npo|c0g/g, ""); // 介质类型
   s = s.replace(/ohm|[ωΩ]|欧姆|欧/g, "o");
   s = s.replace(/[^a-z0-9.μ]/g, "");
   var main = canonScalar(s);
-  if (main !== null) return {main: main, volt: ""};
-  // 在每个数字位置尝试拆出电压（避免 10450v 这类连写被贪婪匹配整段吃掉），
+  if (main !== null) return {main: main, volt: "", watt: watt};
+  // 在每个数字位置尝试拆出电压/瓦数（避免 10450v 这类连写被贪婪匹配整段吃掉），
   // 取剩余部分能解析成阻/容/感值的那种拆法。
   for (var j = 0; j < s.length; j++) {
-    var m = s.slice(j).match(/^(\d+(?:\.\d+)?)(kv|v)/);
+    var m = s.slice(j).match(/^(\d+(?:\.\d+)?)(kv|v|w)/);
     if (!m) continue;
     var rest = s.slice(0, j) + s.slice(j + m[0].length);
     var restMain = canonScalar(rest);
     if (restMain !== null) {
+      if (m[2] == "w") {
+        return {main: restMain, volt: "", watt: "w" + roundNum(parseFloat(m[1]))};
+      }
       return {
         main: restMain,
-        volt: "v" + roundNum(parseFloat(m[1]) * (m[2] == "kv" ? 1000 : 1))
+        volt: "v" + roundNum(parseFloat(m[1]) * (m[2] == "kv" ? 1000 : 1)),
+        watt: watt
       };
     }
   }
@@ -736,18 +747,19 @@ function canonValueParts(value) {
   if (mv) {
     var codeMain = canonScalar(mv[1]);
     if (codeMain !== null) {
-      return {main: codeMain, volt: "v" + roundNum(parseFloat(mv[2]))};
+      return {main: codeMain, volt: "v" + roundNum(parseFloat(mv[2])), watt: watt};
     }
   }
-  return {main: s, volt: ""};
+  return {main: s, volt: "", watt: watt};
 }
 
 function valuesMatch(a, b) {
   var pa = canonValueParts(a);
   var pb = canonValueParts(b);
   if (pa.main != pb.main) return false;
-  // 一方没标耐压则视为通配；双方都标了必须一致（25V 和 16V 是两种库存）
-  return !pa.volt || !pb.volt || pa.volt == pb.volt;
+  // 一方没标耐压/瓦数则视为通配；双方都标了必须一致（25V 和 16V、1W 和 1/8W 是不同库存）
+  if (pa.volt && pb.volt && pa.volt != pb.volt) return false;
+  return !pa.watt || !pb.watt || pa.watt == pb.watt;
 }
 
 // 把解析结果还原成易读写法（悬停提示用），非阻容感返回 null
@@ -767,6 +779,7 @@ function formatValueParts(parts) {
            num >= 1e3 ? roundNum(num / 1e3) + "uH" : roundNum(num) + "nH";
   }
   if (parts.volt) text += " / " + parseFloat(parts.volt.slice(1)) + "V";
+  if (parts.watt) text += " / " + parseFloat(parts.watt.slice(1)) + "W";
   return text;
 }
 

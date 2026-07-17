@@ -657,10 +657,8 @@ function roundNum(x) {
   return parseFloat(x.toPrecision(12));
 }
 
-function canonValue(value) {
-  var s = String(value).toLowerCase();
-  s = s.replace(/ohm|[ωΩ]|欧姆|欧/g, "o");
-  s = s.replace(/[^a-z0-9.μ]/g, "");
+// 清理后的字符串 -> 规范标量（"r4700"/"f100000"/"h4700"），解析不了返回 null
+function canonScalar(s) {
   var m;
   // 电阻，字母作小数点：4k7 / 4r7 / 4m7
   if ((m = s.match(/^(\d+)([rkm])(\d+)o?$/)))
@@ -688,7 +686,40 @@ function canonValue(value) {
     return "h" + roundNum(parseFloat(m[1] + "." + m[3]) * {n: 1, u: 1e3, m: 1e6}[m[2]]);
   if ((m = s.match(/^(\d*\.?\d+)([num])h$/)))
     return "h" + roundNum(parseFloat(m[1]) * {n: 1, u: 1e3, m: 1e6}[m[2]]);
-  return s;
+  return null;
+}
+
+// 值 -> {main, volt}：把 10uF/25V 里的耐压 25V 单独拆出来。
+// 拆分只在剩余部分能解析成阻/容/感值时才生效，芯片型号（SW6306V）不受影响。
+function canonValueParts(value) {
+  var s = String(value).toLowerCase();
+  s = s.replace(/±?\d+(?:\.\d+)?%/g, "");            // 容差 ±10%
+  s = s.replace(/x5r|x7r|x7s|y5v|np0|npo|c0g/g, ""); // 介质类型
+  s = s.replace(/ohm|[ωΩ]|欧姆|欧/g, "o");
+  s = s.replace(/[^a-z0-9.μ]/g, "");
+  var main = canonScalar(s);
+  if (main !== null) return {main: main, volt: ""};
+  var re = /(\d+(?:\.\d+)?)(kv|v)/g;
+  var m;
+  while ((m = re.exec(s)) !== null) {
+    var rest = s.slice(0, m.index) + s.slice(m.index + m[0].length);
+    var restMain = canonScalar(rest);
+    if (restMain !== null) {
+      return {
+        main: restMain,
+        volt: "v" + roundNum(parseFloat(m[1]) * (m[2] == "kv" ? 1000 : 1))
+      };
+    }
+  }
+  return {main: s, volt: ""};
+}
+
+function valuesMatch(a, b) {
+  var pa = canonValueParts(a);
+  var pb = canonValueParts(b);
+  if (pa.main != pb.main) return false;
+  // 一方没标耐压则视为通配；双方都标了必须一致（25V 和 16V 是两种库存）
+  return !pa.volt || !pb.volt || pa.volt == pb.volt;
 }
 
 var binSizeTokens = ["0201", "0402", "0603", "0805", "1206", "1210", "1808", "1812", "2010", "2220", "2512"];
@@ -710,7 +741,7 @@ function packagesMatch(a, b) {
 
 function specsMatch(a, b) {
   return !!a && !!b &&
-    canonValue(a[0]) == canonValue(b[0]) &&
+    valuesMatch(a[0], b[0]) &&
     packagesMatch(a[1], b[1]);
 }
 

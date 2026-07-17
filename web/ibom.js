@@ -681,11 +681,11 @@ function canonScalar(s) {
   // 电容：22p / 100nf / 10uf / 0.1μf
   if ((m = s.match(/^(\d*\.?\d+)([pnuμ])f?$/)))
     return "f" + roundNum(parseFloat(m[1]) * {p: 1, n: 1e3, u: 1e6, "μ": 1e6}[m[2]]);
-  // 电感（nH 基准）：4u7h / 10uh / 2.2mh / 100nh
-  if ((m = s.match(/^(\d+)([num])(\d+)h$/)))
-    return "h" + roundNum(parseFloat(m[1] + "." + m[3]) * {n: 1, u: 1e3, m: 1e6}[m[2]]);
-  if ((m = s.match(/^(\d*\.?\d+)([num])h$/)))
-    return "h" + roundNum(parseFloat(m[1]) * {n: 1, u: 1e3, m: 1e6}[m[2]]);
+  // 电感（nH 基准）：4u7h / 10uh / 10μh / 2.2mh / 100nh
+  if ((m = s.match(/^(\d+)([nuμm])(\d+)h$/)))
+    return "h" + roundNum(parseFloat(m[1] + "." + m[3]) * {n: 1, u: 1e3, "μ": 1e3, m: 1e6}[m[2]]);
+  if ((m = s.match(/^(\d*\.?\d+)([nuμm])h$/)))
+    return "h" + roundNum(parseFloat(m[1]) * {n: 1, u: 1e3, "μ": 1e3, m: 1e6}[m[2]]);
   // 三位数容量代码，统一按电容解读（不作电阻）：101=100pF、104=100nF、475=4.7uF
   if ((m = s.match(/^(\d\d)(\d)$/)))
     return "f" + roundNum(parseInt(m[1], 10) * Math.pow(10, parseInt(m[2], 10)));

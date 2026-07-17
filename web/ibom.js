@@ -716,6 +716,14 @@ function canonValueParts(value) {
       };
     }
   }
+  // 纯数字连写：三位容量代码 + 耐压数字，V 可省略（22610 = 226 + 10V）
+  var mv = s.match(/^(\d{3})(\d{1,4})$/);
+  if (mv) {
+    var codeMain = canonScalar(mv[1]);
+    if (codeMain !== null) {
+      return {main: codeMain, volt: "v" + roundNum(parseFloat(mv[2]))};
+    }
+  }
   return {main: s, volt: ""};
 }
 

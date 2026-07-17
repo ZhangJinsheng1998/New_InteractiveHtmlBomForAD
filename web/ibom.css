@@ -390,6 +390,88 @@ table.bin {
   outline-offset: -2px;
 }
 
+.bin-edit-overlay {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.35);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bin-edit-dialog {
+  background-color: white;
+  border: 1px solid #888;
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  padding: 14px 16px;
+  width: 340px;
+  max-width: 90vw;
+}
+
+.dark .bin-edit-dialog {
+  background-color: #252c30;
+  color: #eee;
+}
+
+.bin-edit-title {
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.bin-edit-hint {
+  color: #888;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+
+#binEditInput {
+  width: 100%;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  font-family: Consolas, "DejaVu Sans Mono", Monaco, monospace;
+  font-size: 14px;
+  border: 1px solid #888;
+  border-radius: 4px;
+}
+
+.dark #binEditInput {
+  background-color: #313b40;
+  color: #eee;
+  border-color: #667;
+}
+
+.bin-edit-preview {
+  min-height: 18px;
+  margin: 8px 0;
+  font-size: 12px;
+  color: #3a3;
+}
+
+.dark .bin-edit-preview {
+  color: #81c784;
+}
+
+.bin-edit-buttons {
+  text-align: right;
+}
+
+.bin-edit-btn {
+  width: auto;
+  height: auto;
+  padding: 5px 16px;
+  margin-left: 8px;
+  font-size: 13px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
 .bom tr:nth-child(even) {
   background-color: #f2f2f2;
 }

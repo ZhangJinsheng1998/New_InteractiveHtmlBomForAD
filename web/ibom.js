@@ -835,31 +835,64 @@ function binCellClicked(key) {
   updateBinHighlight();
 }
 
+// 把输入文本解析成 [值, 封装]：支持「值 | 封装」或「1K0603」连写
+function binParseInput(input) {
+  var sep = input.indexOf("|");
+  if (sep >= 0) {
+    return [input.slice(0, sep).trim(), input.slice(sep + 1).trim()];
+  }
+  var m = input.replace(/\s+/g, "").match(
+    new RegExp("^(.+?)(" + binSizeTokens.join("|") + ")$"));
+  return m ? [m[1], m[2]] : [input, ""];
+}
+
+var binEditKey = null;
+
 function binCellEdit(key) {
-  var current = binAssignments[key] ?
-    binAssignments[key][0] + " | " + binAssignments[key][1] : "";
-  var input = prompt("输入该格存放的元器件，如 1K0603、100nF、SW6306，或「值 | 封装」（留空清除）:", current);
-  if (input === null) return;
-  input = input.trim();
-  if (!input) {
-    delete binAssignments[key];
+  binEditKey = key;
+  document.getElementById("binEditTitle").textContent =
+    "编辑格子 " + key.replace("-", " 行 ") + " 列";
+  var input = document.getElementById("binEditInput");
+  input.value = binAssignments[key] ?
+    binAssignments[key][0] + (binAssignments[key][1] ? " | " + binAssignments[key][1] : "") : "";
+  document.getElementById("binEditOverlay").style.display = "";
+  binEditUpdatePreview();
+  input.focus();
+  input.select();
+}
+
+function binEditUpdatePreview() {
+  var text = document.getElementById("binEditInput").value.trim();
+  var el = document.getElementById("binEditPreview");
+  if (!text) {
+    el.textContent = "留空 = 清除该格";
+    return;
+  }
+  var spec = binParseInput(text);
+  var parsed = formatValueParts(canonValueParts(spec[0]));
+  el.textContent = "识别为: " + (parsed || spec[0] + "（按字面匹配）") +
+    (spec[1] ? " · " + spec[1] : "");
+}
+
+function binEditConfirm() {
+  if (binEditKey === null) return;
+  var text = document.getElementById("binEditInput").value.trim();
+  if (!text) {
+    delete binAssignments[binEditKey];
   } else {
-    var spec;
-    var sep = input.indexOf("|");
-    if (sep >= 0) {
-      spec = [input.slice(0, sep).trim(), input.slice(sep + 1).trim()];
-    } else {
-      // 「1K0603」连写：把结尾的封装尺寸码拆出来
-      var m = input.replace(/\s+/g, "").match(
-        new RegExp("^(.+?)(" + binSizeTokens.join("|") + ")$"));
-      spec = m ? [m[1], m[2]] : [input, ""];
-    }
+    var spec = binParseInput(text);
     binRemoveSpec(spec);
-    binAssignments[key] = spec;
+    binAssignments[binEditKey] = spec;
   }
   saveBinAssignments();
   populateBinTable();
   updateBinHighlight();
+  binEditCancel();
+}
+
+function binEditCancel() {
+  binEditKey = null;
+  document.getElementById("binEditOverlay").style.display = "none";
 }
 
 function binCellClear(key) {
@@ -962,6 +995,13 @@ function initPartsBin() {
     document.getElementById("binScroll").style.display = "none";
     document.getElementById("binToggleBtn").innerHTML = "&#9656;";
   }
+  var editInput = document.getElementById("binEditInput");
+  editInput.oninput = binEditUpdatePreview;
+  editInput.onkeydown = function(e) {
+    e.stopPropagation(); // 别触发 BOM 表的上下键/快捷键
+    if (e.key == "Enter") binEditConfirm();
+    if (e.key == "Escape") binEditCancel();
+  };
   populateBinTable();
 }
 

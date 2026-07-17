@@ -294,6 +294,18 @@
           <table id="binTable" class="bin"></table>
         </div>
       </div>
+      <div id="binEditOverlay" class="bin-edit-overlay hideonprint" style="display: none;" onclick="if (event.target === this) binEditCancel()">
+        <div class="bin-edit-dialog">
+          <div id="binEditTitle" class="bin-edit-title">编辑格子</div>
+          <div class="bin-edit-hint">如 1K0603、10uF25V0805、SW6306，或「值 | 封装」；留空清除</div>
+          <input id="binEditInput" type="text" autocomplete="off">
+          <div id="binEditPreview" class="bin-edit-preview"></div>
+          <div class="bin-edit-buttons">
+            <button class="bin-edit-btn" onclick="binEditConfirm()">确定</button>
+            <button class="bin-edit-btn" onclick="binEditCancel()">取消</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div id="canvasdiv" class="split split-horizontal">
       <div id="frontcanvas" class="split" touch-action="none" style="overflow: hidden">

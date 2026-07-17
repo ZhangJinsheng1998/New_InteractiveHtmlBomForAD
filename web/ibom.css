@@ -1,6 +1,7 @@
 :root {
   --pcb-edge-color: black;
   --pad-color: #878787;
+  --pad-color-inbin: #5b9bd5;
   --pad-hole-color: #CCCCCC;
   --pad-color-highlight: #D04040;
   --pin1-outline-color: #ffb629;
@@ -26,6 +27,7 @@ html, body {
 .dark.topmostdiv {
   --pcb-edge-color: #eee;
   --pad-color: #808080;
+  --pad-color-inbin: #3d7da8;
   --pin1-outline-color: #ffa800;
   --pin1-outline-color-highlight: #ccff00;
   --track-color: #42524f;
@@ -524,6 +526,23 @@ table.bin {
   opacity: 0.6;
 }
 
+#binEditPkg {
+  font-size: 12px;
+  padding: 2px 4px;
+  width: 110px;
+  border: 1px solid #888;
+  border-radius: 4px;
+  background-color: white;
+  font-family: Consolas, "DejaVu Sans Mono", Monaco, monospace;
+}
+
+.dark #binEditPkg {
+  background-color: #313b40;
+  color: #eee;
+  border-color: #667;
+}
+
+
 .bin-edit-preview {
   min-height: 18px;
   margin: 8px 0;
@@ -555,6 +574,15 @@ table.bin {
 
 .dark .bom tr:nth-child(even) {
   background-color: #313b40;
+}
+
+/* BOM 行：元器件盒里有此料时的背景标注（须在条纹规则之后；高亮/锁定优先级更高会覆盖） */
+.bom tr.inbin {
+  background-color: #d9ecf9;
+}
+
+.dark .bom tr.inbin {
+  background-color: #1c3a4d;
 }
 
 .bom tr.checked {

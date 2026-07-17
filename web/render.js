@@ -354,6 +354,10 @@ function drawEdgeCuts(canvas, scalefactor) {
   }
 }
 
+function binHasFootprint(index) {
+  return typeof binAvailableFootprints != "undefined" && binAvailableFootprints.has(index);
+}
+
 function drawFootprints(canvas, layer, scalefactor, highlight) {
   var ctx = canvas.getContext("2d");
   ctx.lineWidth = 3 / scalefactor;
@@ -361,6 +365,7 @@ function drawFootprints(canvas, layer, scalefactor, highlight) {
   var padColor = style.getPropertyValue('--pad-color');
   var padHoleColor = style.getPropertyValue('--pad-hole-color');
   var outlineColor = style.getPropertyValue('--pin1-outline-color');
+  var padColorInBin = style.getPropertyValue('--pad-color-inbin') || padColor;
   if (highlight) {
     padColor = style.getPropertyValue('--pad-color-highlight');
     outlineColor = style.getPropertyValue('--pin1-outline-color-highlight');
@@ -369,8 +374,10 @@ function drawFootprints(canvas, layer, scalefactor, highlight) {
     var mod = pcbdata.footprints[i];
     var outline = settings.renderDnpOutline && pcbdata.bom.skipped.includes(i);
     if (!highlight || highlightedFootprints.includes(i)) {
+      // 元器件盒里有此料的元件用不同焊盘颜色标注
+      var color = (!highlight && binHasFootprint(i)) ? padColorInBin : padColor;
       try {
-        drawFootprint(ctx, layer, scalefactor, mod, padColor, padHoleColor, outlineColor, highlight, outline);
+        drawFootprint(ctx, layer, scalefactor, mod, color, padHoleColor, outlineColor, highlight, outline);
       } catch (e) {
         // 单个元件绘制失败时跳过，避免中断整块板的渲染。
         console.warn("跳过无法绘制的元件 " + (mod && mod.ref) + "：", e);

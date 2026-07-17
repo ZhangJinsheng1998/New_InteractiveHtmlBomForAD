@@ -300,7 +300,7 @@
           <button class="bin-io-btn" onclick="exportBinData()" title="导出全部盒子和类型库为 JSON 文件，用于备份/换电脑/分享">导出</button>
           <button class="bin-io-btn" onclick="importBinData()" title="导入之前导出的盒子数据文件">导入</button>
           <span id="binDupWarn" class="bin-dup-warn" style="display: none;"></span>
-          <span class="bin-hint">点击 BOM 行后单击格子存放；双击编辑（如 1K0603）；右键清空</span>
+          <span class="bin-hint">锁定 BOM 行后点空格子存放；点有料格子跳转 BOM；双击编辑；右键清空</span>
         </div>
         <div id="binScroll" class="bin-scroll">
           <table id="binTable" class="bin"></table>
@@ -326,6 +326,20 @@
               <option>芯片</option>
             </select>
             <span id="binEditTypeNote" class="bin-edit-hint" style="margin-bottom: 0;"></span>
+          </div>
+          <div class="bin-edit-type-row">
+            <span>封装:</span>
+            <input id="binEditPkg" type="text" list="binPkgList" autocomplete="off" placeholder="自动/手动">
+            <datalist id="binPkgList">
+              <option>0201</option><option>0402</option><option>0603</option><option>0805</option>
+              <option>1206</option><option>1210</option><option>1812</option><option>2010</option><option>2512</option>
+              <option>SOT23</option><option>SOT23-5</option><option>SOT23-6</option><option>SOT89</option><option>SOT223</option>
+              <option>SOD123</option><option>SOD323</option><option>SOD523</option>
+              <option>SMA</option><option>SMB</option><option>SMC</option>
+              <option>TO252</option><option>TO263</option><option>SOP8</option><option>MSOP8</option>
+              <option>TSSOP</option><option>QFN</option><option>DFN</option>
+            </datalist>
+            <span id="binEditPkgNote" class="bin-edit-hint" style="margin-bottom: 0;"></span>
           </div>
           <div id="binEditPreview" class="bin-edit-preview"></div>
           <div class="bin-edit-buttons">

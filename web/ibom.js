@@ -576,6 +576,9 @@ function populateBomBody() {
       for (var refIndex of references.map(r => r[1])) {
         footprintIndexToHandler[refIndex] = handler;
       }
+      // 记录该行的 值/封装，用于"盒子里有货"标注
+      tr.dataset.binval = bomentry[1];
+      tr.dataset.binfp = bomentry[2];
     }
     if (netname !== null) {
       netsToHandler[netname] = handler;
@@ -593,6 +596,7 @@ function populateBomBody() {
       checkboxes: settings.checkboxes,
       bommode: settings.bommode,
     });
+  updateBomInBinMarks();
 }
 
 function highlightPreviousRow() {
@@ -883,6 +887,35 @@ function binWarnIfDuplicate(spec, key) {
   }
 }
 
+// 盒子里有货的元件集合（footprint index），用于 PCB 与 BOM 的库存标注
+var binAvailableFootprints = new Set();
+
+function updateBinAvailability() {
+  binAvailableFootprints = new Set();
+  for (var i in footprintSpecs) {
+    if (binFindSpecLocations(footprintSpecs[i], -1, null).length) {
+      binAvailableFootprints.add(parseInt(i));
+    }
+  }
+}
+
+// 给"盒子里有货"的 BOM 行加背景标注
+function updateBomInBinMarks() {
+  if (!bom) return;
+  for (var tr of bom.childNodes) {
+    if (!tr.dataset || tr.dataset.binval === undefined) continue;
+    var has = binFindSpecLocations([tr.dataset.binval, tr.dataset.binfp], -1, null).length > 0;
+    tr.classList.toggle("inbin", has);
+  }
+}
+
+// 盒子数据变化后刷新库存标注（BOM 行背景 + PCB 焊盘颜色）
+function updateBinPresence() {
+  updateBinAvailability();
+  updateBomInBinMarks();
+  redrawIfInitDone();
+}
+
 function findBinCellForSpec(spec) {
   for (var key in binAssignments) {
     if (specsMatch(binAssignments[key], spec)) return key;
@@ -922,32 +955,31 @@ function updateBinHighlight() {
 }
 
 function binCellClicked(key) {
-  var spec = (lockedRowId !== null) ? currentHighlightedSpec() : null;
-  if (spec) {
-    // 有锁定行：把该行的元器件（值+封装）放进格子；点已存放它的格子则取出。
-    if (specsMatch(binAssignments[key], spec)) {
-      delete binAssignments[key];
-    } else {
-      binRemoveSpec(spec); // 同一盒子内是"移动"；其它盒子里的重复只提醒不删
-      binAssignments[key] = spec;
-      binWarnIfDuplicate(spec, key);
-    }
+  var cellSpec = binAssignments[key];
+  var lockedSpec = (lockedRowId !== null) ? currentHighlightedSpec() : null;
+  if (lockedSpec && cellSpec && specsMatch(cellSpec, lockedSpec)) {
+    // 点已存放锁定行元器件的格子 = 取出
+    delete binAssignments[key];
     saveBinAssignments();
     populateBinTable();
-  } else {
-    // 无锁定行：点击已存放的格子反查 BOM 行并锁定、缩放。
-    var cellSpec = binAssignments[key];
-    if (cellSpec) {
-      for (var i in footprintIndexToHandler) {
-        if (specsMatch(footprintSpecs[i], cellSpec)) {
-          footprintIndexToHandler[i]();
-          setRowLock(currentHighlightedRowId);
-          zoomToHighlightedFootprints();
-          smoothScrollToRow(currentHighlightedRowId);
-          break;
-        }
+  } else if (cellSpec) {
+    // 有料的格子：无论是否锁定，都跳转联动到对应 BOM 行（锁定 + 缩放 + 滚动）
+    for (var i in footprintIndexToHandler) {
+      if (specsMatch(footprintSpecs[i], cellSpec)) {
+        footprintIndexToHandler[i]();
+        setRowLock(currentHighlightedRowId);
+        zoomToHighlightedFootprints();
+        smoothScrollToRow(currentHighlightedRowId);
+        break;
       }
     }
+  } else if (lockedSpec) {
+    // 空格子 + 有锁定行：存放
+    binRemoveSpec(lockedSpec); // 同一盒子内是"移动"；其它盒子里的重复只提醒不删
+    binAssignments[key] = lockedSpec;
+    binWarnIfDuplicate(lockedSpec, key);
+    saveBinAssignments();
+    populateBinTable();
   }
   updateBinHighlight();
 }
@@ -970,12 +1002,22 @@ function binCellEdit(key) {
   document.getElementById("binEditTitle").textContent =
     "编辑格子 " + key.replace("-", " 行 ") + " 列";
   var input = document.getElementById("binEditInput");
-  input.value = binAssignments[key] ?
-    binAssignments[key][0] + (binAssignments[key][1] ? " | " + binAssignments[key][1] : "") : "";
+  var spec = binAssignments[key];
+  input.value = spec ? spec[0] : "";
+  document.getElementById("binEditPkg").value = spec ? spec[1] : "";
   document.getElementById("binEditOverlay").style.display = "";
   binEditUpdatePreview();
   input.focus();
   input.select();
+}
+
+// 当前对话框内容 -> [值, 封装]（封装以封装框为准）
+function binEditCurrentSpec() {
+  var text = document.getElementById("binEditInput").value.trim();
+  if (!text) return null;
+  var spec = binParseInput(text);
+  spec[1] = document.getElementById("binEditPkg").value.trim();
+  return spec;
 }
 
 function binEditUpdatePreview() {
@@ -983,14 +1025,19 @@ function binEditUpdatePreview() {
   var el = document.getElementById("binEditPreview");
   var typeSel = document.getElementById("binEditType");
   var note = document.getElementById("binEditTypeNote");
+  var pkgInput = document.getElementById("binEditPkg");
+  var pkgNote = document.getElementById("binEditPkgNote");
   if (!text) {
     el.textContent = "留空 = 清除该格";
     typeSel.value = "";
     typeSel.disabled = true;
     note.textContent = "";
+    pkgNote.textContent = "";
     return;
   }
   var spec = binParseInput(text);
+  // 从连写/「值|封装」里识别出的封装自动填进封装框
+  if (spec[1]) pkgInput.value = spec[1];
   var parts = canonValueParts(spec[0]);
   var parsed = formatValueParts(parts);
   if (parsed) {
@@ -1003,28 +1050,43 @@ function binEditUpdatePreview() {
     typeSel.value = binUserTypes[binTypeKey(spec[0])] || "";
     note.textContent = "认不出时可手选，会记住";
   }
-  el.textContent = "识别为: " + describeSpecValue(spec[0]) +
-    (spec[1] ? " · " + spec[1] : "");
+  pkgNote.textContent = pkgInput.value.trim() ? "已识别" : "识别不了可手动填/选";
+  binEditRenderPreviewLine();
+}
+
+// 只刷新预览行（封装/类型手动修改后调用，不重置各输入框）
+function binEditRenderPreviewLine() {
+  var text = document.getElementById("binEditInput").value.trim();
+  if (!text) return;
+  var spec = binEditCurrentSpec();
+  var typeSel = document.getElementById("binEditType");
+  var desc;
+  if (!typeSel.disabled && typeSel.value) {
+    desc = typeSel.value + " " + spec[0] + "（按字面匹配）";
+  } else {
+    desc = describeSpecValue(spec[0]);
+  }
+  document.getElementById("binEditPreview").textContent =
+    "识别为: " + desc + (spec[1] ? " · " + spec[1] : "");
+}
+
+function binEditPkgChanged() {
+  var pkgNote = document.getElementById("binEditPkgNote");
+  pkgNote.textContent = document.getElementById("binEditPkg").value.trim() ? "" : "识别不了可手动填/选";
+  binEditRenderPreviewLine();
 }
 
 // 手选类型后即时更新预览（仅型号类值可选）
 function binEditTypeChanged() {
-  var text = document.getElementById("binEditInput").value.trim();
-  if (!text) return;
-  var spec = binParseInput(text);
-  var t = document.getElementById("binEditType").value;
-  document.getElementById("binEditPreview").textContent =
-    "识别为: " + (t ? t + " " : "") + spec[0] + "（按字面匹配）" +
-    (spec[1] ? " · " + spec[1] : "");
+  binEditRenderPreviewLine();
 }
 
 function binEditConfirm() {
   if (binEditKey === null) return;
-  var text = document.getElementById("binEditInput").value.trim();
-  if (!text) {
+  var spec = binEditCurrentSpec();
+  if (spec === null) {
     delete binAssignments[binEditKey];
   } else {
-    var spec = binParseInput(text);
     // 手选的类型记进全局类型库（"自动" = 清除记录，恢复内置判断）
     var typeSel = document.getElementById("binEditType");
     if (!typeSel.disabled) {
@@ -1118,6 +1180,7 @@ function populateBinTable() {
   } else {
     warn.style.display = "none";
   }
+  updateBinPresence();
 }
 
 function setClickZoomMax(value) {
@@ -1358,12 +1421,16 @@ function initPartsBin() {
     // ignore malformed stored data
   }
   var editInput = document.getElementById("binEditInput");
-  editInput.oninput = binEditUpdatePreview;
-  editInput.onkeydown = function(e) {
+  var editKeydown = function(e) {
     e.stopPropagation(); // 别触发 BOM 表的上下键/快捷键
     if (e.key == "Enter") binEditConfirm();
     if (e.key == "Escape") binEditCancel();
   };
+  editInput.oninput = binEditUpdatePreview;
+  editInput.onkeydown = editKeydown;
+  var pkgInput = document.getElementById("binEditPkg");
+  pkgInput.oninput = binEditPkgChanged;
+  pkgInput.onkeydown = editKeydown;
   document.getElementById("binEditType").onchange = binEditTypeChanged;
   populateBinBoxSelect();
   binSelectBox(binCurrentBox);

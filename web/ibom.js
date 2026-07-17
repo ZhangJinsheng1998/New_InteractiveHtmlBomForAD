@@ -204,11 +204,19 @@ function setRowLock(rowid) {
 function clearHighlightedFootprints() {
   setRowLock(null);
   if (currentHighlightedRowId) {
-    document.getElementById(currentHighlightedRowId).classList.remove("highlighted");
+    var row = document.getElementById(currentHighlightedRowId);
+    if (row) row.classList.remove("highlighted");
     currentHighlightedRowId = null;
     highlightedFootprints = [];
     highlightedNet = null;
   }
+}
+
+// 点击空白处解除锁定并清掉 PCB 上的高亮
+function clearHighlightAndUnlock() {
+  if (lockedRowId === null && !currentHighlightedRowId) return;
+  clearHighlightedFootprints();
+  drawHighlights();
 }
 
 function createRowHighlightHandler(rowid, refs, net) {
@@ -1756,6 +1764,10 @@ window.onload = function(e) {
   dbgdiv = document.getElementById("dbg");
   bom = document.getElementById("bombody");
   bomhead = document.getElementById("bomhead");
+  // 点击 BOM 表下方空白区域也解除锁定
+  document.getElementById("bomtablescroll").onclick = function(e) {
+    if (e.target === this) clearHighlightAndUnlock();
+  };
   filter = "";
   reflookup = "";
   if (!("nets" in pcbdata)) {

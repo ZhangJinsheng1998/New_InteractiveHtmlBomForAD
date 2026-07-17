@@ -753,6 +753,9 @@ function handleMouseClick(e, layerdict) {
     var footprints = bboxHitScan(layerdict.layer, ...v);
     if (footprints.length > 0) {
       footprintsClicked(footprints);
+    } else {
+      // 点击 PCB 空白处：清除高亮并解锁
+      clearHighlightAndUnlock();
     }
   }
 }

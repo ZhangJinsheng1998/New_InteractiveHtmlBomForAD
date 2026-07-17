@@ -253,7 +253,8 @@ canvas:active {
 .bin-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px 8px;
   padding: 3px 6px;
   font-size: 12px;
 }
@@ -261,6 +262,11 @@ canvas:active {
 .bin-header .bin-title {
   font-weight: bold;
   font-size: 13px;
+  white-space: nowrap;
+}
+
+.bin-header .bin-size-label {
+  white-space: nowrap;
 }
 
 .bin-header input[type="number"] {
@@ -284,6 +290,41 @@ canvas:active {
   font-weight: normal;
   border-radius: 4px;
   cursor: pointer;
+}
+
+#binBoxSelect {
+  font-size: 12px;
+  padding: 2px 4px;
+  max-width: 110px;
+  border: 1px solid #888;
+  border-radius: 4px;
+  background-color: white;
+}
+
+.dark #binBoxSelect {
+  background-color: #313b40;
+  color: #eee;
+  border-color: #667;
+}
+
+.bin-dup-warn {
+  color: #c00;
+  font-size: 11px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.dark .bin-dup-warn {
+  color: #ff8a80;
+}
+
+.bin td.dup {
+  color: #c00;
+  font-weight: bold;
+}
+
+.dark .bin td.dup {
+  color: #ff8a80;
 }
 
 #binToggleBtn {

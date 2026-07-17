@@ -14,7 +14,10 @@ var netsToHandler = {};
 var highlightedFootprints = [];
 var highlightedNet = null;
 var lastClicked;
-var binAssignments = {}; // "row-col" -> [value, footprint]，全局共用
+// 多个元器件盒：每个盒子 {name, rows, cols, cells: {"row-col" -> [值, 封装]}}，全局共用
+var binBoxes = [];
+var binCurrentBox = 0;
+var binAssignments = {}; // 当前盒子 cells 的别名，切盒子时重新指向
 
 function dbg(html) {
   dbgdiv.innerHTML = html;
@@ -818,7 +821,34 @@ function specsMatch(a, b) {
 }
 
 function saveBinAssignments() {
-  writeGlobalStorage("binAssignments", JSON.stringify(binAssignments));
+  writeGlobalStorage("binBoxes", JSON.stringify(binBoxes));
+  writeGlobalStorage("binCurrentBox", binCurrentBox);
+}
+
+// 在所有盒子里找与 spec 重复的位置（可排除某一格）
+function binFindSpecLocations(spec, excludeBox, excludeKey) {
+  var result = [];
+  for (var b = 0; b < binBoxes.length; b++) {
+    for (var key in binBoxes[b].cells) {
+      if (b == excludeBox && key == excludeKey) continue;
+      if (specsMatch(binBoxes[b].cells[key], spec)) {
+        result.push({box: b, key: key});
+      }
+    }
+  }
+  return result;
+}
+
+function binLocationText(loc) {
+  return binBoxes[loc.box].name + " " + loc.key.replace("-", "行") + "列";
+}
+
+// 存放后如与其它格子重复，提醒用户
+function binWarnIfDuplicate(spec, key) {
+  var locs = binFindSpecLocations(spec, binCurrentBox, key);
+  if (locs.length) {
+    alert("注意：该元器件与以下位置重复：\n" + locs.map(binLocationText).join("\n"));
+  }
 }
 
 function findBinCellForSpec(spec) {
@@ -842,13 +872,20 @@ function updateBinHighlight() {
     el.classList.remove("binhl");
   }
   if (lockedRowId === null) return;
-  var key = findBinCellForSpec(currentHighlightedSpec());
-  if (key) {
-    var cell = document.getElementById("bincell-" + key);
-    if (cell) {
-      cell.classList.add("binhl");
-      cell.scrollIntoView({block: "nearest", inline: "nearest"});
-    }
+  var spec = currentHighlightedSpec();
+  if (!spec) return;
+  var key = findBinCellForSpec(spec);
+  if (!key) {
+    // 不在当前盒子里：去其它盒子找，找到就自动切换过去
+    var locs = binFindSpecLocations(spec, binCurrentBox, null);
+    if (locs.length == 0) return;
+    binSelectBox(locs[0].box);
+    key = locs[0].key;
+  }
+  var cell = document.getElementById("bincell-" + key);
+  if (cell) {
+    cell.classList.add("binhl");
+    cell.scrollIntoView({block: "nearest", inline: "nearest"});
   }
 }
 
@@ -859,8 +896,9 @@ function binCellClicked(key) {
     if (specsMatch(binAssignments[key], spec)) {
       delete binAssignments[key];
     } else {
-      binRemoveSpec(spec);
+      binRemoveSpec(spec); // 同一盒子内是"移动"；其它盒子里的重复只提醒不删
       binAssignments[key] = spec;
+      binWarnIfDuplicate(spec, key);
     }
     saveBinAssignments();
     populateBinTable();
@@ -968,6 +1006,7 @@ function binEditConfirm() {
     }
     binRemoveSpec(spec);
     binAssignments[binEditKey] = spec;
+    binWarnIfDuplicate(spec, binEditKey);
   }
   saveBinAssignments();
   populateBinTable();
@@ -992,6 +1031,7 @@ function populateBinTable() {
   var table = document.getElementById("binTable");
   if (!table) return;
   table.innerHTML = "";
+  var dupCount = 0;
   var thead = document.createElement("THEAD");
   var tr = document.createElement("TR");
   tr.appendChild(document.createElement("TH")); // corner
@@ -1018,6 +1058,12 @@ function populateBinTable() {
         td.textContent = spec[0];
         td.title = key.replace("-", "行") + "列: " + spec[0] + " | " + spec[1] +
           "\n识别为: " + describeSpecValue(spec[0]) + (spec[1] ? " · " + spec[1] : "");
+        var dups = binFindSpecLocations(spec, binCurrentBox, key);
+        if (dups.length) {
+          td.classList.add("dup");
+          td.title += "\n⚠ 与 " + dups.map(binLocationText).join("、") + " 重复";
+          dupCount++;
+        }
       } else {
         td.title = key.replace("-", "行") + "列";
       }
@@ -1033,21 +1079,94 @@ function populateBinTable() {
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
+  var warn = document.getElementById("binDupWarn");
+  if (dupCount > 0) {
+    warn.textContent = "⚠ " + dupCount + " 格重复";
+    warn.style.display = "";
+  } else {
+    warn.style.display = "none";
+  }
 }
 
 function setBinSize() {
   var rows = parseInt(document.getElementById("binRowsInput").value);
   var cols = parseInt(document.getElementById("binColsInput").value);
+  var box = binBoxes[binCurrentBox];
   if (rows >= 1 && rows <= 50) {
+    box.rows = rows;
     settings.binRows = rows;
-    writeGlobalStorage("binRows", rows);
   }
   if (cols >= 1 && cols <= 50) {
+    box.cols = cols;
     settings.binCols = cols;
-    writeGlobalStorage("binCols", cols);
   }
+  saveBinAssignments();
   populateBinTable();
   updateBinHighlight();
+}
+
+/* ---- 盒子管理 ---- */
+
+function populateBinBoxSelect() {
+  var sel = document.getElementById("binBoxSelect");
+  sel.innerHTML = "";
+  for (var box of binBoxes) {
+    var opt = document.createElement("OPTION");
+    opt.textContent = box.name;
+    sel.appendChild(opt);
+  }
+  sel.selectedIndex = binCurrentBox;
+}
+
+function binSelectBox(idx) {
+  if (idx < 0 || idx >= binBoxes.length) return;
+  binCurrentBox = idx;
+  var box = binBoxes[idx];
+  binAssignments = box.cells;
+  settings.binRows = box.rows;
+  settings.binCols = box.cols;
+  document.getElementById("binRowsInput").value = box.rows;
+  document.getElementById("binColsInput").value = box.cols;
+  var sel = document.getElementById("binBoxSelect");
+  if (sel.selectedIndex != idx) sel.selectedIndex = idx;
+  writeGlobalStorage("binCurrentBox", idx);
+  populateBinTable();
+}
+
+function binBoxAdd() {
+  var name = prompt("新盒子名称:", "盒子" + (binBoxes.length + 1));
+  if (name === null) return;
+  name = name.trim() || ("盒子" + (binBoxes.length + 1));
+  binBoxes.push({name: name, rows: 8, cols: 16, cells: {}});
+  populateBinBoxSelect();
+  binSelectBox(binBoxes.length - 1);
+  saveBinAssignments();
+}
+
+function binBoxRename() {
+  var box = binBoxes[binCurrentBox];
+  var name = prompt("盒子名称:", box.name);
+  if (name === null || !name.trim()) return;
+  box.name = name.trim();
+  populateBinBoxSelect();
+  saveBinAssignments();
+}
+
+function binBoxDelete() {
+  if (binBoxes.length <= 1) {
+    alert("至少保留一个盒子。");
+    return;
+  }
+  var box = binBoxes[binCurrentBox];
+  var cells = Object.keys(box.cells).length;
+  if (!confirm("删除盒子「" + box.name + "」？其中 " + cells + " 个格子的数据将一并删除。")) {
+    return;
+  }
+  binBoxes.splice(binCurrentBox, 1);
+  binCurrentBox = 0;
+  populateBinBoxSelect();
+  binSelectBox(0);
+  saveBinAssignments();
 }
 
 function toggleBin() {
@@ -1061,14 +1180,23 @@ function toggleBin() {
 function exportBinData() {
   var data = {
     type: "InteractiveHtmlBom parts bin",
-    version: 1,
-    binRows: settings.binRows,
-    binCols: settings.binCols,
-    binAssignments: binAssignments,
+    version: 2,
+    boxes: binBoxes,
+    currentBox: binCurrentBox,
     binUserTypes: binUserTypes,
   };
   var blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
   saveFile("parts-bin.json", blob);
+}
+
+function binValidCells(cells) {
+  var result = {};
+  for (var key in cells) {
+    if (Array.isArray(cells[key]) && cells[key].length == 2) {
+      result[key] = cells[key];
+    }
+  }
+  return result;
 }
 
 function importBinData() {
@@ -1089,25 +1217,44 @@ function importBinData() {
         alert("文件不是有效的元器件盒数据。");
         return;
       }
-      var cells = Object.keys(data.binAssignments || {}).length;
       var types = Object.keys(data.binUserTypes || {}).length;
-      if (!confirm("将导入 " + cells + " 个格子、" + types + " 条类型记录。\n" +
-        "格子数据会覆盖当前盒子，类型库合并。确定？")) {
-        return;
-      }
-      if (data.binRows >= 1 && data.binRows <= 50) {
-        settings.binRows = data.binRows;
-        writeGlobalStorage("binRows", data.binRows);
-      }
-      if (data.binCols >= 1 && data.binCols <= 50) {
-        settings.binCols = data.binCols;
-        writeGlobalStorage("binCols", data.binCols);
-      }
-      binAssignments = {};
-      for (var key in data.binAssignments) {
-        if (Array.isArray(data.binAssignments[key]) && data.binAssignments[key].length == 2) {
-          binAssignments[key] = data.binAssignments[key];
+      if (data.version >= 2 && Array.isArray(data.boxes)) {
+        // v2：整套盒子替换
+        var totalCells = 0;
+        for (var b of data.boxes) {
+          totalCells += Object.keys(b.cells || {}).length;
         }
+        if (!confirm("将导入 " + data.boxes.length + " 个盒子（共 " + totalCells + " 格）、" +
+          types + " 条类型记录。\n盒子数据会整体替换当前的，类型库合并。确定？")) {
+          return;
+        }
+        binBoxes = [];
+        for (var b of data.boxes) {
+          binBoxes.push({
+            name: String(b.name || ("盒子" + (binBoxes.length + 1))),
+            rows: (b.rows >= 1 && b.rows <= 50) ? b.rows : 8,
+            cols: (b.cols >= 1 && b.cols <= 50) ? b.cols : 16,
+            cells: binValidCells(b.cells || {}),
+          });
+        }
+        if (binBoxes.length == 0) {
+          binBoxes = [{name: "盒子1", rows: 8, cols: 16, cells: {}}];
+        }
+        binCurrentBox = 0;
+        populateBinBoxSelect();
+        binSelectBox(0);
+      } else {
+        // v1：单盒子数据，只替换当前盒子
+        var cells = Object.keys(data.binAssignments || {}).length;
+        if (!confirm("将导入 " + cells + " 个格子、" + types + " 条类型记录。\n" +
+          "格子数据会覆盖当前盒子，类型库合并。确定？")) {
+          return;
+        }
+        var box = binBoxes[binCurrentBox];
+        if (data.binRows >= 1 && data.binRows <= 50) box.rows = data.binRows;
+        if (data.binCols >= 1 && data.binCols <= 50) box.cols = data.binCols;
+        box.cells = binValidCells(data.binAssignments || {});
+        binSelectBox(binCurrentBox);
       }
       for (var tk in data.binUserTypes) {
         if (typeof data.binUserTypes[tk] == "string") {
@@ -1116,9 +1263,6 @@ function importBinData() {
       }
       saveBinAssignments();
       saveBinUserTypes();
-      document.getElementById("binRowsInput").value = settings.binRows;
-      document.getElementById("binColsInput").value = settings.binCols;
-      populateBinTable();
       updateBinHighlight();
     };
     reader.readAsText(e.target.files[0], "UTF-8");
@@ -1128,21 +1272,41 @@ function importBinData() {
 
 function initPartsBin() {
   initFootprintSpecs();
-  settings.binRows = parseInt(readGlobalStorage("binRows")) || 8;
-  settings.binCols = parseInt(readGlobalStorage("binCols")) || 16;
-  binAssignments = {};
+  binBoxes = [];
   try {
-    var stored = JSON.parse(readGlobalStorage("binAssignments"));
-    for (var key in stored) {
-      if (Array.isArray(stored[key]) && stored[key].length == 2) {
-        binAssignments[key] = stored[key];
+    var storedBoxes = JSON.parse(readGlobalStorage("binBoxes"));
+    if (Array.isArray(storedBoxes)) {
+      for (var b of storedBoxes) {
+        if (b && typeof b == "object") {
+          binBoxes.push({
+            name: String(b.name || ("盒子" + (binBoxes.length + 1))),
+            rows: (b.rows >= 1 && b.rows <= 50) ? b.rows : 8,
+            cols: (b.cols >= 1 && b.cols <= 50) ? b.cols : 16,
+            cells: binValidCells(b.cells || {}),
+          });
+        }
       }
     }
   } catch (e) {
     // ignore malformed stored data
   }
-  document.getElementById("binRowsInput").value = settings.binRows;
-  document.getElementById("binColsInput").value = settings.binCols;
+  if (binBoxes.length == 0) {
+    // 兼容旧版单盒子数据（binAssignments/binRows/binCols）
+    var oldCells = {};
+    try {
+      oldCells = binValidCells(JSON.parse(readGlobalStorage("binAssignments")) || {});
+    } catch (e) {
+      // ignore
+    }
+    binBoxes = [{
+      name: "盒子1",
+      rows: parseInt(readGlobalStorage("binRows")) || 8,
+      cols: parseInt(readGlobalStorage("binCols")) || 16,
+      cells: oldCells,
+    }];
+  }
+  binCurrentBox = parseInt(readGlobalStorage("binCurrentBox")) || 0;
+  if (binCurrentBox < 0 || binCurrentBox >= binBoxes.length) binCurrentBox = 0;
   if (readGlobalStorage("binCollapsed") == "true") {
     document.getElementById("binScroll").style.display = "none";
     document.getElementById("binToggleBtn").innerHTML = "&#9656;";
@@ -1163,7 +1327,8 @@ function initPartsBin() {
     if (e.key == "Escape") binEditCancel();
   };
   document.getElementById("binEditType").onchange = binEditTypeChanged;
-  populateBinTable();
+  populateBinBoxSelect();
+  binSelectBox(binCurrentBox);
 }
 
 function footprintsClicked(footprintIndexes) {

@@ -282,15 +282,20 @@
         <div class="bin-header">
           <button id="binToggleBtn" onclick="toggleBin()" title="折叠/展开">&#9662;</button>
           <span class="bin-title">元器件盒</span>
+          <select id="binBoxSelect" onchange="binSelectBox(this.selectedIndex)" title="选择元器件盒"></select>
+          <button class="bin-io-btn" onclick="binBoxAdd()" title="新建盒子">＋</button>
+          <button class="bin-io-btn" onclick="binBoxRename()" title="重命名当前盒子">改名</button>
+          <button class="bin-io-btn" onclick="binBoxDelete()" title="删除当前盒子">删</button>
           <label class="bin-size-label">行
             <input id="binRowsInput" type="number" min="1" max="50" onchange="setBinSize()">
           </label>
           <label class="bin-size-label">列
             <input id="binColsInput" type="number" min="1" max="50" onchange="setBinSize()">
           </label>
-          <button class="bin-io-btn" onclick="exportBinData()" title="导出盒子数据和类型库为 JSON 文件，用于备份/换电脑/分享">导出</button>
+          <button class="bin-io-btn" onclick="exportBinData()" title="导出全部盒子和类型库为 JSON 文件，用于备份/换电脑/分享">导出</button>
           <button class="bin-io-btn" onclick="importBinData()" title="导入之前导出的盒子数据文件">导入</button>
-          <span class="bin-hint">全部板卡共用 · 点击 BOM 行后单击格子存放；双击编辑（如 1K0603）；右键清空</span>
+          <span id="binDupWarn" class="bin-dup-warn" style="display: none;"></span>
+          <span class="bin-hint">点击 BOM 行后单击格子存放；双击编辑（如 1K0603）；右键清空</span>
         </div>
         <div id="binScroll" class="bin-scroll">
           <table id="binTable" class="bin"></table>

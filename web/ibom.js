@@ -753,10 +753,21 @@ function canonValueParts(value) {
   return {main: s, volt: "", watt: watt};
 }
 
+function isCanonScalarMain(main) {
+  return /^[rfh]\d+(?:\.\d+)?(?:e[+-]?\d+)?$/.test(main);
+}
+
 function valuesMatch(a, b) {
   var pa = canonValueParts(a);
   var pb = canonValueParts(b);
-  if (pa.main != pb.main) return false;
+  if (pa.main != pb.main) {
+    // 型号类（非阻容感数值）：一方是另一方的前缀也算匹配，
+    // 如盒子写 RT9080 匹配 BOM 的 RT9080-33GB；短方至少 4 字符防误配。
+    if (isCanonScalarMain(pa.main) || isCanonScalarMain(pb.main)) return false;
+    var shorter = pa.main.length < pb.main.length ? pa.main : pb.main;
+    var longer = pa.main.length < pb.main.length ? pb.main : pa.main;
+    if (shorter.length < 4 || longer.indexOf(shorter) !== 0) return false;
+  }
   // 一方没标耐压/瓦数则视为通配；双方都标了必须一致（25V 和 16V、1W 和 1/8W 是不同库存）
   if (pa.volt && pb.volt && pa.volt != pb.volt) return false;
   return !pa.watt || !pb.watt || pa.watt == pb.watt;

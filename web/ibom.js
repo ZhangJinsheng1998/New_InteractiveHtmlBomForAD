@@ -696,6 +696,10 @@ function canonScalar(s) {
 // 拆分只在剩余部分能解析成阻/容/感值时才生效，芯片型号（SW6306V）不受影响。
 function canonValueParts(value) {
   var s = String(value).toLowerCase();
+  // 已知器件型号（二极管/MOS/三极管）不做数值解析，避免 1N4148 被误读成 1.4148nF
+  if (guessComponentType(value)) {
+    return {main: s.replace(/[^a-z0-9.μ]/g, ""), volt: ""};
+  }
   s = s.replace(/±?\d+(?:\.\d+)?%/g, "");            // 容差 ±10%
   s = s.replace(/x5r|x7r|x7s|y5v|np0|npo|c0g/g, ""); // 介质类型
   s = s.replace(/ohm|[ωΩ]|欧姆|欧/g, "o");
@@ -753,6 +757,30 @@ function formatValueParts(parts) {
   }
   if (parts.volt) text += " / " + parseFloat(parts.volt.slice(1)) + "V";
   return text;
+}
+
+// 按常见型号前缀猜器件类型（仅提示用，不参与匹配）
+function guessComponentType(value) {
+  var s = String(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (/pmos/.test(s)) return "PMOS";
+  if (/nmos/.test(s)) return "NMOS";
+  if (/^(ao3401|ao3407|ao3415|si2301|si2305|irlml6402|cj2301)/.test(s)) return "PMOS";
+  if (/^(ao3400|ao3402|si2302|2n7002|bss138|irlml2502|irlml6344|cj2302|nce\d)/.test(s)) return "NMOS";
+  if (/^(s8050|s8550|ss8050|ss8550|s9012|s9013|s9014|s9015|s9018|2n3904|2n3906|mmbt|bc807|bc817|bc846|bc856)/.test(s)) return "三极管";
+  if (/^(1n\d{3}|b5817|b5819|bat\d|mbr\d|sk[1-9]\d?|ss1\d|ss2\d|ss3\d|es[1-3][a-m]|m7$|us1[a-m]|rs1[a-m]|ll4148|ll4448|smaj|smbj|smf|1ss\d|bzt52|bzx84|zmm)/.test(s)) return "二极管";
+  if (/^led|^发光/.test(s)) return "LED";
+  return null;
+}
+
+// 值的完整识别描述（悬停提示/编辑预览共用）
+function describeSpecValue(value) {
+  var parts = canonValueParts(value);
+  var parsed = formatValueParts(parts);
+  if (parsed) {
+    return {r: "电阻", f: "电容", h: "电感"}[parts.main[0]] + " " + parsed;
+  }
+  var guess = guessComponentType(value);
+  return (guess ? guess + " " : "") + value + "（按字面匹配）";
 }
 
 var binSizeTokens = ["0201", "0402", "0603", "0805", "1206", "1210", "1808", "1812", "2010", "2220", "2512"];
@@ -877,8 +905,7 @@ function binEditUpdatePreview() {
     return;
   }
   var spec = binParseInput(text);
-  var parsed = formatValueParts(canonValueParts(spec[0]));
-  el.textContent = "识别为: " + (parsed || spec[0] + "（按字面匹配）") +
+  el.textContent = "识别为: " + describeSpecValue(spec[0]) +
     (spec[1] ? " · " + spec[1] : "");
 }
 
@@ -939,9 +966,8 @@ function populateBinTable() {
       if (spec) {
         td.classList.add("assigned");
         td.textContent = spec[0];
-        var parsed = formatValueParts(canonValueParts(spec[0]));
         td.title = key.replace("-", "行") + "列: " + spec[0] + " | " + spec[1] +
-          (parsed ? "\n识别为: " + parsed + (spec[1] ? " · " + spec[1] : "") : "");
+          "\n识别为: " + describeSpecValue(spec[0]) + (spec[1] ? " · " + spec[1] : "");
       } else {
         td.title = key.replace("-", "行") + "列";
       }

@@ -276,6 +276,16 @@ canvas:active {
   text-overflow: ellipsis;
 }
 
+.bin-io-btn {
+  width: auto;
+  height: auto;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: normal;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
 #binToggleBtn {
   background-color: transparent;
   border: none;

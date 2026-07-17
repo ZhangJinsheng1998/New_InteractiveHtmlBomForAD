@@ -1058,6 +1058,74 @@ function toggleBin() {
   writeGlobalStorage("binCollapsed", collapsed);
 }
 
+function exportBinData() {
+  var data = {
+    type: "InteractiveHtmlBom parts bin",
+    version: 1,
+    binRows: settings.binRows,
+    binCols: settings.binCols,
+    binAssignments: binAssignments,
+    binUserTypes: binUserTypes,
+  };
+  var blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+  saveFile("parts-bin.json", blob);
+}
+
+function importBinData() {
+  var input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".json";
+  input.onchange = function(e) {
+    var reader = new FileReader();
+    reader.onload = function(readerEvent) {
+      var data;
+      try {
+        data = JSON.parse(readerEvent.target.result);
+      } catch (err) {
+        alert("文件不是有效的元器件盒数据。");
+        return;
+      }
+      if (!data || data.type != "InteractiveHtmlBom parts bin") {
+        alert("文件不是有效的元器件盒数据。");
+        return;
+      }
+      var cells = Object.keys(data.binAssignments || {}).length;
+      var types = Object.keys(data.binUserTypes || {}).length;
+      if (!confirm("将导入 " + cells + " 个格子、" + types + " 条类型记录。\n" +
+        "格子数据会覆盖当前盒子，类型库合并。确定？")) {
+        return;
+      }
+      if (data.binRows >= 1 && data.binRows <= 50) {
+        settings.binRows = data.binRows;
+        writeGlobalStorage("binRows", data.binRows);
+      }
+      if (data.binCols >= 1 && data.binCols <= 50) {
+        settings.binCols = data.binCols;
+        writeGlobalStorage("binCols", data.binCols);
+      }
+      binAssignments = {};
+      for (var key in data.binAssignments) {
+        if (Array.isArray(data.binAssignments[key]) && data.binAssignments[key].length == 2) {
+          binAssignments[key] = data.binAssignments[key];
+        }
+      }
+      for (var tk in data.binUserTypes) {
+        if (typeof data.binUserTypes[tk] == "string") {
+          binUserTypes[tk] = data.binUserTypes[tk];
+        }
+      }
+      saveBinAssignments();
+      saveBinUserTypes();
+      document.getElementById("binRowsInput").value = settings.binRows;
+      document.getElementById("binColsInput").value = settings.binCols;
+      populateBinTable();
+      updateBinHighlight();
+    };
+    reader.readAsText(e.target.files[0], "UTF-8");
+  };
+  input.click();
+}
+
 function initPartsBin() {
   initFootprintSpecs();
   settings.binRows = parseInt(readGlobalStorage("binRows")) || 8;

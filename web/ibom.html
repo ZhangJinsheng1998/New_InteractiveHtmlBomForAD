@@ -288,6 +288,8 @@
           <label class="bin-size-label">列
             <input id="binColsInput" type="number" min="1" max="50" onchange="setBinSize()">
           </label>
+          <button class="bin-io-btn" onclick="exportBinData()" title="导出盒子数据和类型库为 JSON 文件，用于备份/换电脑/分享">导出</button>
+          <button class="bin-io-btn" onclick="importBinData()" title="导入之前导出的盒子数据文件">导入</button>
           <span class="bin-hint">全部板卡共用 · 点击 BOM 行后单击格子存放；双击编辑（如 1K0603）；右键清空</span>
         </div>
         <div id="binScroll" class="bin-scroll">

@@ -727,6 +727,26 @@ function valuesMatch(a, b) {
   return !pa.volt || !pb.volt || pa.volt == pb.volt;
 }
 
+// 把解析结果还原成易读写法（悬停提示用），非阻容感返回 null
+function formatValueParts(parts) {
+  var m = parts.main.match(/^([rfh])(\d+(?:\.\d+)?(?:e[+-]?\d+)?)$/);
+  if (!m) return null;
+  var num = parseFloat(m[2]);
+  var text;
+  if (m[1] == "r") {
+    text = num >= 1e6 ? roundNum(num / 1e6) + "MΩ" :
+           num >= 1e3 ? roundNum(num / 1e3) + "KΩ" : roundNum(num) + "Ω";
+  } else if (m[1] == "f") {
+    text = num >= 1e6 ? roundNum(num / 1e6) + "uF" :
+           num >= 1e3 ? roundNum(num / 1e3) + "nF" : roundNum(num) + "pF";
+  } else {
+    text = num >= 1e6 ? roundNum(num / 1e6) + "mH" :
+           num >= 1e3 ? roundNum(num / 1e3) + "uH" : roundNum(num) + "nH";
+  }
+  if (parts.volt) text += " / " + parseFloat(parts.volt.slice(1)) + "V";
+  return text;
+}
+
 var binSizeTokens = ["0201", "0402", "0603", "0805", "1206", "1210", "1808", "1812", "2010", "2220", "2512"];
 
 function canonPackage(footprint) {
@@ -878,7 +898,9 @@ function populateBinTable() {
       if (spec) {
         td.classList.add("assigned");
         td.textContent = spec[0];
-        td.title = key.replace("-", "行") + "列: " + spec[0] + " | " + spec[1];
+        var parsed = formatValueParts(canonValueParts(spec[0]));
+        td.title = key.replace("-", "行") + "列: " + spec[0] + " | " + spec[1] +
+          (parsed ? "\n识别为: " + parsed + (spec[1] ? " · " + spec[1] : "") : "");
       } else {
         td.title = key.replace("-", "行") + "列";
       }
